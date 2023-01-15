@@ -460,7 +460,7 @@ contract TradeModel is ITradeModel {
         
         // swapping underlying for valueUSD
         if ( _dTokenOut == address(0)) {
-            uint cashPost = availCash;
+            uint cashPost = availCash + amountIn;
             (amountOut, reserveFeeUnderly,totalFeeAmt) = amountOutUSDInternal(amountIn, oraclePrice, iUSDbalance, cashPost, traderBalanceXDP,_referrer);
 
         // swapping valueUSD for underlying
