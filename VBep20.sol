@@ -25,7 +25,7 @@ import "./VToken.sol";
  * redeem(), mintBehalf(), _addReserves() removed 
  *
  *** ADDITIONS ***
- * swapExactTokensForTokens() to support selling dToken's Underlying
+ * swapExactTokenForToken() to support selling dToken's Underlying
  *
  */
 contract VBep20 is VToken, VBep20Interface {
@@ -292,7 +292,6 @@ contract VBep20 is VToken, VBep20Interface {
         address dTokenOut = dTokenOut_referrer[0]; 
         address payable referrer = address(uint160(dTokenOut_referrer[1]));
         require(dTokenOut_referrer.length == 2 && dTokenOut != address(this) && comptroller.dTokenApproved(dTokenOut),"!dTokenOut_referrer"); 
-        doTransferIn(msg.sender, _amountTokenIn);
 
         // calculates valueOut and updates balances
         (uint256 valueUSD, uint256 reserveTradeFee,) = amountsOut(address(this), address(0), _amountTokenIn, msg.sender, referrer); // amountOut USD
@@ -309,6 +308,7 @@ contract VBep20 is VToken, VBep20Interface {
         VTokenInterface(dTokenOut).sendTokenOut(valueUSD, _minOut, _sendTo, _deadline); 
         require(iUSDrate() > int(-iUSDlimit),"!iUSDrate.");
 
+        doTransferIn(msg.sender, _amountTokenIn);
         emit SwapExactTokensForTokens(dTokenOut, _amountTokenIn, valueUSD);
     }
 
