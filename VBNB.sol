@@ -14,8 +14,6 @@ pragma solidity ^0.5.16;
 // PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// 0x022d21035c00594bdFBdAf77bEF76BBCe597d876,0x301e4668d64D36B4F78A6D6d0BbE4AC07315EA2D,1000000000000000000,"Dual Pool BNB","dBNB",18,0x250642F2860532610f1B0CF867420a7633819b26
-
 import "./VToken.sol";
 
 
@@ -28,6 +26,7 @@ import "./VToken.sol";
  * swapExactBNBForToken() to support selling BNB
  *
  */
+
 contract dBNB is VToken {
     /**
      * @notice Construct a new VBNB money market
@@ -41,6 +40,7 @@ contract dBNB is VToken {
      */
     constructor(ComptrollerInterface comptroller_,
                 InterestRateModel interestRateModel_,
+                ITradeModel tradeModel_,
                 uint initialExchangeRateMantissa_,
                 string memory name_,
                 string memory symbol_,
@@ -49,7 +49,7 @@ contract dBNB is VToken {
         // Creator of the contract is admin during initialization
         admin = msg.sender;
 
-        initialize(comptroller_, interestRateModel_, initialExchangeRateMantissa_, name_, symbol_, decimals_);
+        initialize(comptroller_, interestRateModel_, tradeModel_, initialExchangeRateMantissa_, name_, symbol_, decimals_);
 
         // Set the proper admin now that initialization is done
         admin = admin_;
@@ -186,6 +186,10 @@ contract dBNB is VToken {
     // ------------------ ADDITIONS FOR TRADING --------------- //
 
 
+    function getCashCurrent() internal view returns (uint) {
+        return address(this).balance;
+    }
+
     /**
      * @notice Allows user to sell (deposit) BNB to get underlying from another dual pool
      * @dev Signal is sent (with valueUSD) to approved dTokens to send out its underlying token to _sendTo
@@ -195,7 +199,7 @@ contract dBNB is VToken {
      * @param _sendTo The address to send this dTokens underlying
      * @param _deadline Trade must be completed before this deadline (in block.timestamp)
      */
-    function swapExactETHForTokens(uint _minOut, address[] calldata dTokenOut_referrer, address payable _sendTo, uint _deadline) external payable {
+    function swapExactETHForTokens(uint _minOut, address[] calldata dTokenOut_referrer, address payable _sendTo, uint _deadline) external nonReentrant payable {
         
         // requirements (BNB accepted first due to payable function)
         address dTokenOut = dTokenOut_referrer[0]; 
@@ -205,16 +209,17 @@ contract dBNB is VToken {
 
         // calculates valueOut and updates balances
         (uint256 mintiUSD, uint256 reserveTradeFee,) = amountsOut(address(this), address(0), msg.value, msg.sender, referrer); // amountOut USD
-        iUSDbalance -= int(mintiUSD); // updates global variables
+        iUSDbalance = iUSDbalance - int(mintiUSD); // updates global variables
+
+        VTokenInterface(dTokenOut).sendTokenOut(mintiUSD, _minOut, _sendTo, _deadline); 
 
         // sends fee to referrer (if one exists), otherwise add to totalReserves
         if (referrer != address(0)) {
             doTransferOut(referrer,reserveTradeFee);
         } else {
-            totalReserves += reserveTradeFee; // trading fee in underlying
+            totalReserves = totalReserves + reserveTradeFee; // trading fee in underlying
         }
 
-        VTokenInterface(dTokenOut).sendTokenOut(mintiUSD, _minOut, _sendTo, _deadline); 
         require(iUSDrate() > int(-iUSDlimit),"sell would exceed iUSD limit.");
 
         emit SwapExactETHForTokens(dTokenOut, msg.value, mintiUSD);
