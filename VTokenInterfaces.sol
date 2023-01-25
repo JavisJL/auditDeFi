@@ -157,7 +157,7 @@ contract VTokenStorage {
      * @notice The Trade Model contract which has the major calcuations for iUSDrate(), priceImpact when trading, 
      *         and protocolLoss/removeLiquidityFee when redeeming or borrowing
      */
-    ITradeModel public tradeModel = ITradeModel(0xdC976ef337cce294bB7a09d9B1EeEc963c3942bc); // mainnet: 0xCcbCAd7Ba8Aa64b62ECd1e92E04a3E46bf11B50C
+    ITradeModel public tradeModel; // mainnet: 0xCcbCAd7Ba8Aa64b62ECd1e92E04a3E46bf11B50C
     
 
 }
@@ -271,6 +271,23 @@ contract VTokenInterface is VTokenStorage {
     event NewTradeModel(ITradeModel oldTradeModel, ITradeModel newTradeModel);
 
     /*** ------- ADDITIONS FOR TRADING  ---------- ***/
+
+    /**
+     * @notice Event emitted when iUSD limit is changed
+     */
+    event SetIUSDLimit(uint oldLimit, uint newLimit);
+
+    /**
+     * @notice Event emitted when trade model is changed
+     */
+    event SetTradeModel(address oldTradeModel, address newTradeModel);
+
+    /**
+     * @notice Event emitted when dTokens underlying is bought (sent out)
+     */
+    event SendTokenOut(address callingContract, uint valueIn, uint amountOut);
+
+
     /**
      * @notice Emitted when swapping BNB for token 
      */
