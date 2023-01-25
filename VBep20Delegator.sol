@@ -14,7 +14,6 @@ pragma solidity ^0.5.16;
 // PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-
 import "./VTokenInterfaces.sol";
 
 /**
@@ -22,7 +21,7 @@ import "./VTokenInterfaces.sol";
  * @notice VTokens which wrap an EIP-20 underlying and delegate to an implementation
  * @author Venus
  */
-contract dTokenDelegator is VTokenInterface, VBep20Interface, VDelegatorInterface {
+contract dBUSDDelegator is VTokenInterface, VBep20Interface, VDelegatorInterface {
     /**
      * @notice Construct a new money market
      * @param underlying_ The address of the underlying asset
@@ -39,6 +38,7 @@ contract dTokenDelegator is VTokenInterface, VBep20Interface, VDelegatorInterfac
     constructor(address underlying_,
                 ComptrollerInterface comptroller_,
                 InterestRateModel interestRateModel_,
+                ITradeModel tradeModel_,
                 uint initialExchangeRateMantissa_,
                 string memory name_,
                 string memory symbol_,
@@ -50,10 +50,11 @@ contract dTokenDelegator is VTokenInterface, VBep20Interface, VDelegatorInterfac
         admin = msg.sender;
 
         // First delegate gets to initialize the delegator (i.e. storage contract)
-        delegateTo(implementation_, abi.encodeWithSignature("initialize(address,address,address,uint256,string,string,uint8)",
+        delegateTo(implementation_, abi.encodeWithSignature("initialize(address,address,address,address,uint256,string,string,uint8)",
                                                             underlying_,
                                                             comptroller_,
                                                             interestRateModel_,
+                                                            tradeModel_,
                                                             initialExchangeRateMantissa_,
                                                             name_,
                                                             symbol_,
@@ -475,28 +476,44 @@ contract dTokenDelegator is VTokenInterface, VBep20Interface, VDelegatorInterfac
     // ----------- Aditions for Trading ------------ // 
 
 
+    /**
+     * @notice Allows admin to change the iUSD limit the contract must stay within
+     * @param _limit The desired new iUSDrate limit 
+     */
     function _setLimitIUSD(uint _limit) external {
         delegateToImplementation(abi.encodeWithSignature("_setLimitIUSD(uint256)", _limit));
     }
 
+
+    /**
+     * @notice Allows admin to change the tradeModel contract address
+     * @param newTradeModel address of desired new trade model 
+     */
     function _setTradeModel(ITradeModel newTradeModel) external{
         delegateToImplementation(abi.encodeWithSignature("_setTradeModel(address)", newTradeModel));
     }
 
+
+    /**
+     * @notice Gets the current price of the dToken from price oracle
+     * @return price The current oracle price of this dToken
+     */
     function getPriceToken() public view returns (uint) {
         bytes memory data = delegateToViewImplementation(abi.encodeWithSignature("getPriceToken()"));
         return abi.decode(data, (uint));
     }
 
-    function getExchangeCash() external view returns (uint) {
-        bytes memory data = delegateToViewImplementation(abi.encodeWithSignature("getExchangeCash()"));
-        return abi.decode(data, (uint));
-    }
 
+    /**
+     * @notice Calls the tradeModel to get the iUSDrate() 
+     * @dev Current formula is getCashPrior() + iUSDbalance/getPriceToken() may change 
+     * @return rate The calculated iUSD rate
+     */
     function iUSDrate() external view returns (int) {
         bytes memory data = delegateToViewImplementation(abi.encodeWithSignature("iUSDrate()"));
         return abi.decode(data, (int));
     }
+
 
     /**
      * @notice Reduces the removeAmt (for borrow or redeem) by a small fee
@@ -511,6 +528,19 @@ contract dTokenDelegator is VTokenInterface, VBep20Interface, VDelegatorInterfac
         bytes memory data = delegateToViewImplementation(abi.encodeWithSignature("removeAmountMinusFee(uint)",removeAmt));
         return abi.decode(data, (uint));
     }
+
+
+    /**
+     * @notice Calls cashAddUSDMinusLoss from tradeModel to get cash used for exchange rate calculation
+     * @dev Formula = cash + (USD - protocolLoss)/oraclePrice where protocolLoss is the integral 
+     *      over the priceImpact curve from current iUSDrate() to zero
+     * @return cashPlusUSDMinusLoss The cash to be considered for exchange rate
+     */
+    function getExchangeCash() external view returns (uint) {
+        bytes memory data = delegateToViewImplementation(abi.encodeWithSignature("getExchangeCash()"));
+        return abi.decode(data, (uint));
+    }
+
 
     /**
      * @notice calls getCashAddUSDMultAbsRate in tradeModel to get amount of cash available for borrow or redeem
