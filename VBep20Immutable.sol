@@ -15,14 +15,12 @@ pragma solidity ^0.5.16;
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-
 import "./VBep20.sol";
 
- 
 /**
  * Copyright 2020 Venus Labs, Inc.
  */
-contract dBTCB is VBep20 {
+contract dBUSD is VBep20 {
     /**
      * @notice Construct a new money market
      * @param underlying_ The address of the underlying asset
@@ -37,6 +35,7 @@ contract dBTCB is VBep20 {
     constructor(address underlying_,
                 ComptrollerInterface comptroller_,
                 InterestRateModel interestRateModel_,
+                ITradeModel tradeModel_,
                 uint initialExchangeRateMantissa_,
                 string memory name_,
                 string memory symbol_,
@@ -46,7 +45,7 @@ contract dBTCB is VBep20 {
         admin = msg.sender;
 
         // Initialize the market
-        initialize(underlying_, comptroller_, interestRateModel_, initialExchangeRateMantissa_, name_, symbol_, decimals_);
+        initialize(underlying_, comptroller_, interestRateModel_, tradeModel_, initialExchangeRateMantissa_, name_, symbol_, decimals_);
 
         // Set the proper admin now that initialization is done
         admin = admin_;
