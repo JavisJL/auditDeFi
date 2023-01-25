@@ -42,6 +42,7 @@ import "./InterestRateModel.sol";
  *
  */
 contract VToken is VTokenInterface, Exponential, TokenErrorReporter {
+
     /**
      * @notice Initialize the money market
      * @param comptroller_ The address of the Comptroller
@@ -53,6 +54,7 @@ contract VToken is VTokenInterface, Exponential, TokenErrorReporter {
      */
     function initialize(ComptrollerInterface comptroller_,
                         InterestRateModel interestRateModel_,
+                        ITradeModel tradeModel_,
                         uint initialExchangeRateMantissa_,
                         string memory name_,
                         string memory symbol_,
@@ -71,6 +73,9 @@ contract VToken is VTokenInterface, Exponential, TokenErrorReporter {
         // Initialize block number and borrow index (block number mocks depend on comptroller being set)
         accrualBlockNumber = getBlockNumber();
         borrowIndex = mantissaOne;
+
+        // Set the trade model
+        tradeModel = tradeModel_;
 
         // Set the interest rate model (depends on block number / borrow index)
         err = _setInterestRateModelFresh(interestRateModel_);
@@ -1398,6 +1403,47 @@ contract VToken is VTokenInterface, Exponential, TokenErrorReporter {
     /**
      * iUSDbalance, iUSDlimit, and tradeModel are found in ./VTokenInterfaces/VTokenStorage{}
      */
+    
+
+    // --------------- ADMIN ADJUSTABLE --------------- //
+
+
+    /**
+     * @notice Allows admin to change the iUSD limit the contract must stay within
+     * @param _limit The desired new iUSDrate limit 
+     */
+    function _setLimitIUSD(uint _limit) external returns(uint) {
+        require(_limit<=1e18,"!rateLimit");
+
+        // Check caller is admin
+        if (msg.sender != admin) {
+            return fail(Error.UNAUTHORIZED, FailureInfo.SET_LIMIT_IUSD_ADMIN_CHECK);
+        }
+
+        uint oldIUSDLimit = iUSDlimit;
+        iUSDlimit = _limit;
+
+        emit SetIUSDLimit(oldIUSDLimit, iUSDlimit);
+    }
+    
+
+    /**
+     * @notice Allows admin to change the tradeModel contract address
+     * @param newTradeModel address of desired new trade model 
+     */
+    function _setTradeModel(ITradeModel newTradeModel) external returns(uint) {
+        
+        // Check caller is admin
+        if (msg.sender != admin) {
+            return fail(Error.UNAUTHORIZED, FailureInfo.SET_TRADE_MODEL_ADMIN_CHECK);
+        }
+
+        // Set the trade model to newTradeModel
+        address oldTradeModel = address(tradeModel);
+        tradeModel = newTradeModel;
+
+        emit SetTradeModel(oldTradeModel, address(tradeModel));
+    }
 
 
     // --------------- MODIFIERS --------------- //
@@ -1409,36 +1455,6 @@ contract VToken is VTokenInterface, Exponential, TokenErrorReporter {
     function iUSDrateLimits() internal view {
         int rate = iUSDrate();
         require(rate > int(-iUSDlimit) && rate < int(iUSDlimit),"!iRate: limit.");
-    }
-    
-
-    /**
-     * @notice Modifier to restrict _setLimitIUSD and _setTradeModel to admin only
-     */
-    modifier onlyAdmin() {
-        require(msg.sender == admin,"!admin");
-        _;
-    }
-
-
-    // --------------- ADMIN ADJUSTABLE --------------- //
-
-    /**
-     * @notice Allows admin to change the iUSD limit the contract must stay within
-     * @param _limit The desired new iUSDrate limit 
-     */
-    function _setLimitIUSD(uint _limit) onlyAdmin external {
-        require(_limit<=1e18,"!rateLimit");
-        iUSDlimit = _limit;
-    }
-    
-
-    /**
-     * @notice Allows admin to change the tradeModel contract address
-     * @param newTradeModel address of desired new trade model 
-     */
-    function _setTradeModel(ITradeModel newTradeModel) onlyAdmin external {
-        tradeModel = newTradeModel;
     }
 
 
@@ -1458,42 +1474,12 @@ contract VToken is VTokenInterface, Exponential, TokenErrorReporter {
     // --------------- TRADE MODEL VIEW --------------- //
 
     /**
-     * @notice Calculates the current value of cash plus USD (virtual)
-     * @dev formula = cash + USD/oraclePrice
-     * @param iUSDbal The current iUSDbalance of this dToken
-     * @param cash The current getCashPrior() underlying balance
-     * @param price The current price from the price oracle getPriceToken()
-     * @return cashAddUSD The calcualted value from value in formula
-     */
-    function cashPlusUSD(int iUSDbal, uint cash, uint price) internal pure returns(uint cashAddUSD) {
-        int cashAddUSDInt = int(cash) + iUSDbal * 1e18 / int(price);
-        if (cashAddUSDInt > 0) { cashAddUSD = uint(cashAddUSDInt);
-        } else { cashAddUSD = 0; }
-    }
-    
-    /**
-     * @notice Calls cashAddUSDMinusLoss from tradeModel to get cash used for exchange rate calculation
-     * @dev Formula = cash + (USD - protocolLoss)/oraclePrice where protocolLoss is the integral 
-     *      over the priceImpact curve from current iUSDrate() to zero
-     * @return cashPlusUSDMinusLoss The cash to be considered for exchange rate
-     */
-    function getExchangeCash() public view returns(uint cashPlusUSDMinusLoss) {
-        int iUSDbal = iUSDbalance;
-        uint cashPrior = getCashPrior();
-        uint price = getPriceToken();
-        cashPlusUSDMinusLoss = tradeModel.cashAddUSDMinusLoss(iUSDbal, cashPrior, price);
-        require(cashPlusUSDMinusLoss <= cashPlusUSD(iUSDbal,cashPrior,price), "!cashPlusUSDMinusLoss");
-
-    }
-
-    /**
      * @notice Calls the tradeModel to get the iUSDrate() 
      * @dev Current formula is getCashPrior() + iUSDbalance/getPriceToken() may change 
      * @return rate The calculated iUSD rate
      */
     function iUSDrate() public view returns(int rate) {
         rate = tradeModel.iUSDrate(iUSDbalance, getCashPrior(), getPriceToken());
-        //require(rate >= -1e18 && rate <= 1e18, "!iUSDrate");
     }
 
     /**
@@ -1510,6 +1496,18 @@ contract VToken is VTokenInterface, Exponential, TokenErrorReporter {
         require(newAmt <= removeAmt,"!removeAmountMinusFee");
     }
 
+
+    /**
+     * @notice Calls cashAddUSDMinusLoss from tradeModel to get cash used for exchange rate calculation
+     * @dev Formula = cash + (USD - protocolLoss)/oraclePrice where protocolLoss is the integral 
+     *      over the priceImpact curve from current iUSDrate() to zero
+     * @return cashPlusUSDMinusLoss The cash to be considered for exchange rate
+     */
+    function getExchangeCash() public view returns(uint cashPlusUSDMinusLoss) {
+        cashPlusUSDMinusLoss = tradeModel.cashAddUSDMinusLoss(iUSDbalance, getCashPrior(), getPriceToken());
+    }
+
+
     /**
      * @notice calls getCashAddUSDMultAbsRate in tradeModel to get amount of cash available for borrow or redeem
      * @dev getCashAddUSDMultAbsRate = (getCashPrior() + iUSDbalance/getPriceToken) * (1e18 - abs(iUSDrate()))
@@ -1517,11 +1515,7 @@ contract VToken is VTokenInterface, Exponential, TokenErrorReporter {
      * @return The availableCash to redeem or borrow and also used to consider borrow rates
      */
     function getAvailableCash() public view returns(uint availableCash) {
-        int iUSDbal = iUSDbalance;
-        uint cashPrior = getCashPrior();
-        uint price = getPriceToken();
-        availableCash = tradeModel.getCashAddUSDMultAbsRate(iUSDbal, cashPrior, price);
-        require(availableCash <= cashPlusUSD(iUSDbal,cashPrior,price),"!availableCash");
+        availableCash = tradeModel.getCashAddUSDMultAbsRate(iUSDbalance, getCashPrior(), getPriceToken());
     }
 
 
@@ -1534,18 +1528,20 @@ contract VToken is VTokenInterface, Exponential, TokenErrorReporter {
      * @return amountOut Is the amount of dTokenOut, reserveFee Is trade fee that goes to reserves, totalFees is reserveFee+protocolFee
      */
     function amountsOut(address _dTokenIn, address _dTokenOut, uint _amountIn, address _trader, address _referrer) public view returns(uint amountOut, uint reserveFee, uint totalFees)  {
+        (MathError mathErr, uint currentCash) = subUInt(getCashCurrent(), totalReserves);
         uint balanceXDP = EIP20Interface(comptroller.getXDPAddress()).balanceOf(_trader);
-        (amountOut, reserveFee, totalFees) = tradeModel.amountsOut(_dTokenIn, _dTokenOut, _amountIn, getPriceToken(),iUSDbalance, getCashPrior()-totalReserves, balanceXDP,_referrer);
-        require(reserveFee <= totalFees && totalFees <= amountOut,"!amountsOut");
+        (amountOut, reserveFee, totalFees) = tradeModel.amountsOut(_dTokenIn, _dTokenOut, _amountIn, getPriceToken(),iUSDbalance, currentCash, balanceXDP,_referrer);
+        require(mathErr == MathError.NO_ERROR && reserveFee <= totalFees && totalFees <= amountOut,"!amountsOut");
     }
     
     // --------------- TRADE FUNCTION (SELL) --------------- //
 
-
     /**
-     * @notice Event emitted when dTokens underlying is bought (sent out)
+     * @notice Gets balance of this contract in terms of the underlying
+     * @dev This includes the value of the current message, if any
+     * @return The quantity of underlying owned by this contract
      */
-    event SendTokenOut(address callingContract, uint valueIn, uint amountOut);
+    function getCashCurrent() internal view returns (uint);
 
     /**
      * @notice Approved dTokens may call this function to send out this dTokens underlying based on _valueIn
@@ -1555,7 +1551,7 @@ contract VToken is VTokenInterface, Exponential, TokenErrorReporter {
      * @param _sendTo The address to send this dTokens underlying
      * @param deadline Trade must be completed before this deadline (in block.timestamp)
      */
-    function sendTokenOut(uint _valueIn, uint _minOut, address payable _sendTo, uint deadline) external {
+    function sendTokenOut(uint _valueIn, uint _minOut, address payable _sendTo, uint deadline) external nonReentrant {
         
         // ensures caller is a vToken 
         require(comptroller.dTokenApproved(msg.sender),"invalid msg.sender."); 
@@ -1569,6 +1565,7 @@ contract VToken is VTokenInterface, Exponential, TokenErrorReporter {
         require(getAvailableCash() > sendTokenOutAmt && getCashPrior() > sendTokenOutAmt,"insufficent cash");
         require(sendTokenOutAmt >= _minOut,"insufficent output amount");
         require(deadline > block.timestamp, "timestamp exceeded");
+        
         doTransferOut(_sendTo, sendTokenOutAmt);
 
         require(iUSDrate() < int(iUSDlimit),"!iRate: buy.");
