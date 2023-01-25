@@ -17,7 +17,7 @@ contract VBep20Delegate is VBep20, VDelegateInterface {
      * @notice Called by the delegator on a delegate to initialize it for duty
      * @param data The encoded bytes data for any initialization
      */
-    function _becomeImplementation(bytes memory data) public onlyAdmin() {
+    function _becomeImplementation(bytes memory data) public {
         // Shh -- currently unused
         data;
 
@@ -25,16 +25,20 @@ contract VBep20Delegate is VBep20, VDelegateInterface {
         if (false) {
             implementation = address(0);
         }
+
+        require(msg.sender == admin, "!admin _becomeImplementation");
     }
 
     /**
      * @notice Called by the delegator on a delegate to forfeit its responsibility
      */
-    function _resignImplementation() public onlyAdmin() {
+    function _resignImplementation() public {
         // Shh -- we don't ever want this hook to be marked pure
         if (false) {
             implementation = address(0);
         }
+
+        require(msg.sender == admin, "!admin _resignImplementation");
 
     }
 }
