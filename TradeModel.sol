@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.5.16;
 //pragma experimental ABIEncoderV2;
+import "./SafeMath.sol";
+import "./SignedSafeMath.sol";
 
 
 import "./ITradeModel.sol";
@@ -8,11 +10,11 @@ import "./ITradeModel.sol";
 
 contract TradeModel is ITradeModel {
 
+    using SafeMath for uint;
+    using SignedSafeMath for int;
 
     // ---------- PUBLIC VARIABLES ------------- // 
 
-
-    bool isTradeModel = true;
     address public admin;
 
     /**
@@ -72,6 +74,7 @@ contract TradeModel is ITradeModel {
 
     // ---------- ADMIN FUNCTIONS ------------- //
 
+    event SetTradeFee(uint oldTradeFee, uint newTradeFee);
     /**
      * @notice Allows admin to set trading fee (before discounts)
      * @dev Must be below 2%
@@ -79,10 +82,13 @@ contract TradeModel is ITradeModel {
      */
     function _setTradeFee(uint _tradeFeePerc) external onlyAdmin() {
         require(_tradeFeePerc<=0.02e18,"!tradeFee");
+        uint oldTradeFee = tradeFeePerc;
         tradeFeePerc = _tradeFeePerc;
+        emit SetTradeFee(oldTradeFee, tradeFeePerc);
     }
 
 
+    event SetTradeReserveFactor(uint oldReserveFactor, uint newReserveFactor);
     /**
      * @notice Allows admin to set percentage of trade fee that goes to reserves
      * @dev Must be below 100% (of trading fee)
@@ -90,31 +96,55 @@ contract TradeModel is ITradeModel {
      */
     function _setTradeReserveFactor(uint _tradeReserveFactor) external onlyAdmin() {
         require(_tradeReserveFactor <= 1e18,"!tradeReserveFactor");
+        uint oldReserveFactor = tradeReserveFactor;
         tradeReserveFactor = _tradeReserveFactor;
+        emit SetTradeReserveFactor(oldReserveFactor, tradeReserveFactor);
 
     }
 
-
+    event oldTradeFeeThresholds(uint shrimpThres, uint fishThres, uint sharkThres, uint whaleThres);
+    event newTradeFeeThresholds(uint shrimpThres, uint fishThres, uint sharkThres, uint whaleThres);
     /**
-     * @notice Allows admin to trading fee discount thresholds (i.e how much XDP must be held to receive discount)
+     * @notice Allows admin to change trading fee discount thresholds (i.e how much XDP must be held to receive discount)
      * @dev shrimpThres < fishThres < sharkThres, whaleThres
      */
-    function _updateTradeFeeDiscounts(uint _shrimpThres, uint _fishThres, uint _sharkThres, uint _whaleThres) external onlyAdmin() {
+    function _updateTradeFeeDiscountThresholds(uint _shrimpThres, uint _fishThres, uint _sharkThres, uint _whaleThres) external onlyAdmin() {
         require(_shrimpThres <  _fishThres && _fishThres < _sharkThres && _sharkThres < _whaleThres,"!threshold");
+        emit oldTradeFeeThresholds(shrimpThreshold, fishThreshold, sharkThreshold, whaleThreshold);
         shrimpThreshold = _shrimpThres;
         fishThreshold = _fishThres;
         sharkThreshold = _sharkThres;
         whaleThreshold = _whaleThres;
+        emit newTradeFeeThresholds(shrimpThreshold, fishThreshold, sharkThreshold, whaleThreshold);
     }
 
 
+    event oldTradeFeePercents(uint shrimpDisc, uint fishDisc, uint sharkDisc, uint whaleDisc);
+    event newTradeFeePercents(uint shrimpDisc, uint fishDisc, uint sharkDisc, uint whaleDisc);
+    /**
+     * @notice Allows admin to change trading fee discount percents (i.e how much XDP must be held to receive discount)
+     * @dev shrimpThres < fishThres < sharkThres, whaleThres
+     */
+    function _updateTradeFeeDiscountPercents(uint _shrimpDis, uint _fishDis, uint _sharkDis, uint _whaleDis) external onlyAdmin() {
+        require(_shrimpDis <  _fishDis && _fishDis < _sharkDis && _sharkDis < _whaleDis && _whaleDis <= 0.90e18,"!threshold");
+        emit oldTradeFeePercents(shrimpDiscount, fishDiscount, sharkDiscount, whaleDiscount);
+        shrimpDiscount = _shrimpDis;
+        fishDiscount = _shrimpDis;
+        sharkDiscount = _sharkDis;
+        whaleDiscount = _whaleDis;
+        emit newTradeFeePercents(shrimpDiscount, fishDiscount, sharkDiscount, whaleDiscount);
+    }
+
+    event SetPriceImpactLimit(uint oldLimit, uint newLimit);
     /**
      * @notice Allows admin to change the price impact limit
      * @dev limit must be below 100% (1e18)
      */
     function setPriceImpactLimit(uint _limit) external onlyAdmin() {
         require(_limit <= 1e18, "invalid price impact limit");
+        uint oldLimit = priceImpactLimit;
         priceImpactLimit = _limit;
+        emit SetPriceImpactLimit(oldLimit, priceImpactLimit);
     }
 
 
@@ -122,27 +152,22 @@ contract TradeModel is ITradeModel {
 
 
     function getValue(uint256 _amount, uint256 _price) public pure returns(uint256) {
-        return _amount * _price / 1e18;
+        //return _amount * _price / 1e18;
+        return _amount.mul(_price).div(1e18);
     }
 
     function getAssetAmt(uint256 _amount, uint256 _price) public pure returns(uint256) {
-        return _amount * 1e18 / _price;
-    }
-
-    function getAssetAmtInt(int _amount, int _price) public pure returns(int) {
-        return _amount * 1e18 / _price;
+        //return _amount * 1e18 / _price;
+        return _amount.mul(1e18).div(_price);
     }
 
     function getValueInt(int _amount, int _price) public pure returns(int) {
-        return _amount * _price / 1e18;
+        return _amount.mul(_price).div(1e18);
     }
 
-    function min(uint256 a, uint256 b) public pure returns(uint256) {
-        return b >= a ? a : b;
-    }
 
-    function max(uint256 a, uint256 b) public pure returns(uint256) {
-        return b >= a ? b : a;
+    function getAssetAmtInt(int _amount, int _price) public pure returns(int) {
+        return _amount.mul(1e18).div(_price);
     }
 
     function abs(int256 x) public pure returns (uint256) {
@@ -164,11 +189,11 @@ contract TradeModel is ITradeModel {
     function iUSDrate(int _iUSDbalance, uint _availCash, uint _price) public pure returns(int rate) {
         // need to add in case where  pool balance is 0! 
         uint poolValue = getValue(_availCash, _price);
-        int poolValuePlusIUSD = int(poolValue) + _iUSDbalance;
+        int poolValuePlusIUSD = int(poolValue).add(_iUSDbalance);
         if (poolValuePlusIUSD <= 0) {
             rate = -1e18;
         } else {
-            rate = _iUSDbalance * 1e18 / poolValuePlusIUSD;
+            rate = getAssetAmtInt(_iUSDbalance,poolValuePlusIUSD);
             if (rate > 1e18) {
                 rate = 1e18;
             } else if (rate < -1e18) {
@@ -188,7 +213,7 @@ contract TradeModel is ITradeModel {
      */
     function priceImpact(int _iUSDbalance, uint _availCash, uint _price) public view returns(int rate) {
         int _iUSDrate = iUSDrate(_iUSDbalance, _availCash, _price);
-        rate = _iUSDrate * int(abs(_iUSDrate)) / 1e18; // 10% * 10% --> 1%
+        rate = getValueInt(_iUSDrate,int(abs(_iUSDrate))); // 10% * 10% --> 1%
         int _priceImpactLimit = int(priceImpactLimit);
         if (rate > _priceImpactLimit) {
             rate = _priceImpactLimit;
@@ -226,8 +251,7 @@ contract TradeModel is ITradeModel {
      */
     function removeLiquidityFee(uint removeLiquidity, int _iUSDbalance, uint _availCash, uint _price) public view returns(uint fee) {
         uint startProtocolLoss = protocolLoss(_iUSDbalance, _availCash, _price);
-        uint newAvailableCash = _availCash - removeLiquidity;
-        require(newAvailableCash>=0,"remove liquidity exceed cash.");
+        uint newAvailableCash = _availCash.sub(removeLiquidity);
         uint endProtocolLoss = protocolLoss(_iUSDbalance, newAvailableCash, _price);
 
         require(endProtocolLoss >= startProtocolLoss,"remove liquidity would result in less protocol loss. Something wrong");
@@ -248,7 +272,7 @@ contract TradeModel is ITradeModel {
      */
     function newRemoveLiquidityAmt(uint removeLiquidity, int _iUSDbalance, uint _availCash, uint _price) public view returns(uint newAmt) {
         uint _removeLiquidityFee = removeLiquidityFee(removeLiquidity, _iUSDbalance,  _availCash, _price);
-        int _newAmt = int(removeLiquidity) - int(_removeLiquidityFee);
+        int _newAmt = int(removeLiquidity).sub(int(_removeLiquidityFee));
         require(_newAmt>=0,"!newAmt");
         newAmt = uint(_newAmt);
     }
@@ -264,7 +288,7 @@ contract TradeModel is ITradeModel {
     */
     function adjustedPrice(int _iUSDbalance, uint _availCash, uint _price) public view returns(uint adjPrice) {
         int _priceImpact = priceImpact(_iUSDbalance, _availCash, _price);
-        int oneMinusAbsPriceImpact = 1e18 - int(abs(_priceImpact));
+        int oneMinusAbsPriceImpact = int(1e18).sub(int(abs(_priceImpact)));
         if (oneMinusAbsPriceImpact>0) { // premium
             if (_priceImpact <=0) {
                 adjPrice = getValue(_price, uint(oneMinusAbsPriceImpact));
@@ -290,8 +314,8 @@ contract TradeModel is ITradeModel {
      */
     function cashAddUSDMinusLoss(int iUSDbalance, uint availCash, uint oraclePrice) public view returns(uint cashPlusUSD) {
         uint _protocolLoss = protocolLoss(iUSDbalance, availCash, oraclePrice);
-        int iUSDbalanceMinusLoss = iUSDbalance - int(_protocolLoss);
-        int _cashAddUSD = int(availCash) + getAssetAmtInt(iUSDbalanceMinusLoss,int(oraclePrice));
+        int iUSDbalanceMinusLoss = iUSDbalance.sub(int(_protocolLoss));
+        int _cashAddUSD = int(availCash).add(getAssetAmtInt(iUSDbalanceMinusLoss,int(oraclePrice)));
         if (_cashAddUSD>0) {
             cashPlusUSD = uint(_cashAddUSD);
         } else {
@@ -310,9 +334,9 @@ contract TradeModel is ITradeModel {
      * @return cashAddUSDMultUSDrate Returns the available cash in pool 
      */
     function getCashAddUSDMultAbsRate(int iUSDbalance, uint availCash, uint oraclePrice) external view returns(uint cashAddUSDMultUSDrate) {
-        int cashPlusUSD =  int(availCash) + getAssetAmtInt(iUSDbalance,int(oraclePrice));
+        int cashPlusUSD =  int(availCash).add(getAssetAmtInt(iUSDbalance,int(oraclePrice)));
         if (cashPlusUSD > 0) {
-            uint OneMinusAbsUSDrate = 1e18 - abs(iUSDrate(iUSDbalance, availCash, oraclePrice));
+            uint OneMinusAbsUSDrate = uint(1e18).sub(abs(iUSDrate(iUSDbalance, availCash, oraclePrice)));
             cashAddUSDMultUSDrate = getValue(uint(cashPlusUSD), OneMinusAbsUSDrate);
         } else {
             cashAddUSDMultUSDrate = 0;
@@ -360,15 +384,15 @@ contract TradeModel is ITradeModel {
 
         // XDP discount
         uint discountXDP = feeDiscount(_traderBalXVS);
-        uint oneMinusDiscounts = 1e18 - discountXDP - _referralDiscount;
+        uint oneMinusDiscounts = uint(1e18).sub(discountXDP).sub(_referralDiscount);
         uint tradeFeePercAfterDiscount = getValue(tradeFeePerc , oneMinusDiscounts);
         require(tradeFeePercAfterDiscount>0 && tradeFeePercAfterDiscount < 0.01e18, "trade fee must be (0%,1%]");
 
 
-        uint oneMinusTradeFee = 1e18 - tradeFeePercAfterDiscount;
+        uint oneMinusTradeFee = uint(1e18).sub(tradeFeePercAfterDiscount);
         outputAmt = getValue(_inputAmt , oneMinusTradeFee);
-        totalFeeAmt = _inputAmt - outputAmt;
-        reserveFeeAmt = totalFeeAmt * tradeReserveFactor / 1e18; // may need to mulitply again
+        totalFeeAmt = _inputAmt.sub(outputAmt);
+        reserveFeeAmt = getValue(totalFeeAmt,tradeReserveFactor); // may need to mulitply again
     }
 
 
@@ -387,15 +411,15 @@ contract TradeModel is ITradeModel {
         (uint amountTokenIn, uint ownerFeeAmount, uint _totalFeeAmt) = amtAfterFee(_amountTokenIn, _traderBalXVS,_referrer);
 
         // get first post estimates
-        int iUSDpostEst = _iUSDbalance - int(getValue(amountTokenIn, _initialPrice));
+        int iUSDpostEst = _iUSDbalance.sub(int(getValue(amountTokenIn, _initialPrice)));
         uint pricePost = adjustedPrice(iUSDpostEst, _postCash, _initialPrice);
 
         // get second (more accurate) post estimates
-        iUSDpostEst = _iUSDbalance - int(getValue(amountTokenIn, pricePost));
+        iUSDpostEst = _iUSDbalance.sub(int(getValue(amountTokenIn, pricePost)));
         pricePost = adjustedPrice(iUSDpostEst, _postCash, _initialPrice);
 
         // get third (more accurate) post estimates
-        iUSDpostEst = _iUSDbalance - int(getValue(amountTokenIn, pricePost));
+        iUSDpostEst = _iUSDbalance.sub(int(getValue(amountTokenIn, pricePost)));
         pricePost = adjustedPrice(iUSDpostEst, _postCash, _initialPrice);
 
         // get amount out
@@ -419,18 +443,18 @@ contract TradeModel is ITradeModel {
     function amountOutTokenInternal(uint _amtInUSD, uint _initialPrice, int _iUSDbalance, uint _availCash, uint _traderBalXVS) public view returns(uint amountOutToken, uint reserveFeeUnderly, uint totalFeeAmt) {
         // base trade fee
         (uint amtInUSD, uint ownerFeeAmountIUSD, uint _totalFeeAmtUSD)  = amtAfterFee(_amtInUSD, _traderBalXVS, address(0));
-        int iUSDpost = _iUSDbalance + int(amtInUSD);
+        int iUSDpost = _iUSDbalance.add(int(amtInUSD));
         
         // get first post estimates
-        uint tokenPostEst = _availCash - getAssetAmt(amtInUSD, _initialPrice);
+        uint tokenPostEst = _availCash.sub(getAssetAmt(amtInUSD, _initialPrice));
         uint pricePost = adjustedPrice(iUSDpost, tokenPostEst, _initialPrice);
 
         // get second (more accurate) post estimates
-        tokenPostEst = _availCash - getAssetAmt(amtInUSD, pricePost);
+        tokenPostEst = _availCash.sub(getAssetAmt(amtInUSD, pricePost));
         pricePost = adjustedPrice(iUSDpost, tokenPostEst, _initialPrice);
 
         // get third (more accurate) post estimates
-        tokenPostEst = _availCash - getAssetAmt(amtInUSD, pricePost);
+        tokenPostEst = _availCash.sub(getAssetAmt(amtInUSD, pricePost));
         pricePost = adjustedPrice(iUSDpost, tokenPostEst, _initialPrice);
 
 
@@ -460,8 +484,7 @@ contract TradeModel is ITradeModel {
         
         // swapping underlying for valueUSD
         if ( _dTokenOut == address(0)) {
-            uint cashPost = availCash + amountIn;
-            (amountOut, reserveFeeUnderly,totalFeeAmt) = amountOutUSDInternal(amountIn, oraclePrice, iUSDbalance, cashPost, traderBalanceXDP,_referrer);
+            (amountOut, reserveFeeUnderly,totalFeeAmt) = amountOutUSDInternal(amountIn, oraclePrice, iUSDbalance, availCash, traderBalanceXDP,_referrer);
 
         // swapping valueUSD for underlying
         } else if (_dTokenIn == address(0)) {
