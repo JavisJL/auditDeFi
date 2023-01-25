@@ -28,6 +28,7 @@ import "./VToken.sol";
  * swapExactTokenForToken() to support selling dToken's Underlying
  *
  */
+
 contract VBep20 is VToken, VBep20Interface {
     /**
      * @notice Initialize the new money market
@@ -43,6 +44,7 @@ contract VBep20 is VToken, VBep20Interface {
         address underlying_,
         ComptrollerInterface comptroller_,
         InterestRateModel interestRateModel_,
+        ITradeModel tradeModel_,
         uint256 initialExchangeRateMantissa_,
         string memory name_,
         string memory symbol_,
@@ -52,6 +54,7 @@ contract VBep20 is VToken, VBep20Interface {
         super.initialize(
             comptroller_,
             interestRateModel_,
+            tradeModel_,
             initialExchangeRateMantissa_,
             name_,
             symbol_,
@@ -77,33 +80,6 @@ contract VBep20 is VToken, VBep20Interface {
         return err;
     }
 
-    /**
-     * @notice Sender supplies assets into the market and receiver receives vTokens in exchange
-     * @dev Accrues interest whether or not the operation succeeds, unless reverted
-     * @param receiver the account which is receiving the vTokens
-     * @param mintAmount The amount of the underlying asset to supply
-     * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
-     
-    function mintBehalf(address receiver, uint256 mintAmount)
-        external
-        returns (uint256)
-    {
-        (uint256 err, ) = mintBehalfInternal(receiver, mintAmount);
-        return err;
-    }
-    */
-
-    /**
-     * @notice Sender redeems vTokens in exchange for the underlying asset
-     * @dev Accrues interest whether or not the operation succeeds, unless reverted
-     * @param redeemTokens The number of vTokens to redeem into underlying
-     * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
-     
-    function redeem(uint256 redeemTokens) external returns (uint256 success) {
-        success = redeemInternal(redeemTokens);
-    }
-    */
-    
 
     /**
      * @notice Sender redeems vTokens in exchange for a specified amount of underlying asset
@@ -168,15 +144,6 @@ contract VBep20 is VToken, VBep20Interface {
         return err;
     }
 
-    /**
-     * @notice The sender adds to reserves.
-     * @param addAmount The amount fo underlying token to add as reserves
-     * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
-     
-    function _addReserves(uint addAmount) external returns (uint) {
-        return _addReservesInternal(addAmount);
-    }
-    */
   
 
     /*** Safe Token ***/
@@ -275,6 +242,10 @@ contract VBep20 is VToken, VBep20Interface {
     // ---------------- ADDITIONS FOR TRADING  -------------------- //
 
 
+    function getCashCurrent() internal view returns(uint) {
+        return getCashPrior();
+    }
+
     /**
      * @notice Allows user to sell (deposit) an underyling token to get underlying from another dual pool
      * @dev Signal is sent (with valueUSD) to approved dTokens to send out its underlying token to _sendTo
@@ -286,29 +257,31 @@ contract VBep20 is VToken, VBep20Interface {
      * @param _deadline Trade must be completed before this deadline (in block.timestamp)
      */
     //function swapExactTokensForTokens(uint amountIn,uint amountOutMin,address[] memory dTokenOut_referrer,address payable to,uint deadline) public {}
-    function swapExactTokensForTokens(uint256 _amountTokenIn, uint256 _minOut, address[] calldata dTokenOut_referrer, address payable _sendTo, uint256 _deadline) external {
+    function swapExactTokensForTokens(uint256 _amountTokenIn, uint256 _minOut, address[] calldata dTokenOut_referrer, address payable _sendTo, uint256 _deadline) external nonReentrant {
         
         // accepts token transfer in
         address dTokenOut = dTokenOut_referrer[0]; 
         address payable referrer = address(uint160(dTokenOut_referrer[1]));
         require(dTokenOut_referrer.length == 2 && dTokenOut != address(this) && comptroller.dTokenApproved(dTokenOut),"!dTokenOut_referrer"); 
 
+        // accepts BEP20 transfer and gets actual amount received
+        uint actualAmountIn = doTransferIn(msg.sender, _amountTokenIn);
+
         // calculates valueOut and updates balances
-        (uint256 valueUSD, uint256 reserveTradeFee,) = amountsOut(address(this), address(0), _amountTokenIn, msg.sender, referrer); // amountOut USD
-        iUSDbalance -= int256(valueUSD); // updates global variables
-        
+        (uint256 valueUSD, uint256 reserveTradeFee,) = amountsOut(address(this), address(0), actualAmountIn, msg.sender, referrer); // amountOut USD
+        iUSDbalance = iUSDbalance - int256(valueUSD); // updates global variables
+
         // sends fee to referrer (if one exists), otherwise add to totalReserves
         if (referrer != address(0)) {
             doTransferOut(referrer,reserveTradeFee);
         } else {
-            totalReserves += reserveTradeFee; // trading fee in underlying
+            totalReserves = totalReserves + reserveTradeFee; // trading fee in underlying
         }
         
         // ensures tokenOut is an approved dToken, and sends signal
         VTokenInterface(dTokenOut).sendTokenOut(valueUSD, _minOut, _sendTo, _deadline); 
         require(iUSDrate() > int(-iUSDlimit),"!iUSDrate.");
 
-        doTransferIn(msg.sender, _amountTokenIn);
         emit SwapExactTokensForTokens(dTokenOut, _amountTokenIn, valueUSD);
     }
 
