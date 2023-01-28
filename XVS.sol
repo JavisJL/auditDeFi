@@ -71,7 +71,7 @@ contract XVS is Tokenlock {
     uint8 public constant decimals = 18;
 
     /// @notice Total number of tokens in circulation
-    uint public constant totalSupply = 30000000e18; // 30 million XVS
+    uint public totalSupply = 30000000e18; // 30 million XVS
 
     /// @notice Allowance amounts on behalf of others
     mapping (address => mapping (address => uint96)) internal allowances;
@@ -132,6 +132,23 @@ contract XVS is Tokenlock {
      */
     function allowance(address account, address spender) external view returns (uint) {
         return allowances[account][spender];
+    }
+
+    /**
+     * @dev Destoys `amount` tokens from `msg.sender`, reducing the total supply.
+     *
+     * Emits a `Transfer` event with `to` set to the zero address.
+     *
+     * Requirements
+     * - `account` cannot be the zero address.
+     * - `account` must have at least `amount` tokens.
+     */
+    function burn(uint256 rawAmount) external {
+        require(msg.sender != address(0), "ERC20: burn from the zero address");
+        uint96 amount96 = safe96(rawAmount, "XTT::burn: amount exceeds 96 bits");
+        totalSupply = sub256(totalSupply,rawAmount,"XTT::burn: unable to decrease supply");
+        balances[msg.sender] = sub96(balances[msg.sender],amount96,"XTT::burn: unable to decrease senders balance");
+        emit Transfer(msg.sender, address(0), amount96);
     }
 
     /**
@@ -347,6 +364,11 @@ contract XVS is Tokenlock {
     }
 
     function sub96(uint96 a, uint96 b, string memory errorMessage) internal pure returns (uint96) {
+        require(b <= a, errorMessage);
+        return a - b;
+    }
+
+    function sub256(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
         require(b <= a, errorMessage);
         return a - b;
     }
