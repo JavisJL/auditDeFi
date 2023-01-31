@@ -1457,6 +1457,26 @@ contract VToken is VTokenInterface, Exponential, TokenErrorReporter {
         require(rate > int(-iUSDlimit) && rate < int(iUSDlimit),"!iRate: limit.");
     }
 
+    // ------------ Signed Safe Math ------------ // 
+
+    /**
+     * @dev Subtracts two signed integers, reverts on overflow.
+     */
+    function subINT(int256 a, int256 b) internal pure returns (int256) {
+        int256 c = a - b;
+        require((b >= 0 && c <= a) || (b < 0 && c > a), "!sub overflow");
+
+        return c;
+    }
+
+
+    function addUINT(uint256 a, uint256 b) internal pure returns (uint256) {
+        uint256 c = a + b;
+        require(c >= a, "!add overflow");
+
+        return c;
+    }
+
 
     // --------------- COMPTROLLER VIEW --------------- //
 
@@ -1558,8 +1578,8 @@ contract VToken is VTokenInterface, Exponential, TokenErrorReporter {
 
         // calculates tokenOut and updates balances
         (uint256 sendTokenOutAmt, uint256 reserveTradeFee,) = amountsOut(address(0), address(this), _valueIn, _sendTo,address(0)); // amountOut this token 
-        iUSDbalance += int256(_valueIn); // update global variables
-        totalReserves += reserveTradeFee; // trading fee in underlying
+        iUSDbalance = subINT(iUSDbalance,int256(_valueIn)); // update global variables
+        totalReserves = addUINT(totalReserves,reserveTradeFee); // trading fee in underlying
 
         // check sufficient balance and transfers token out
         require(getAvailableCash() > sendTokenOutAmt && getCashPrior() > sendTokenOutAmt,"insufficent cash");
