@@ -28,7 +28,7 @@ contract TradeModel is ITradeModel {
      * @notice Percentage of trading fees that goes to reserves
      */
     uint public tradeReserveFactor = 0.25e18; 
-    uint public referralDiscount = 0.10e18; // referral gets 10% off trading fees
+    uint public constant referralDiscount = 0.10e18; // referral gets 10% off trading fees
 
 
     /**
@@ -256,7 +256,7 @@ contract TradeModel is ITradeModel {
 
         require(endProtocolLoss >= startProtocolLoss,"remove liquidity would result in less protocol loss. Something wrong");
 
-        uint feeUSD = endProtocolLoss - startProtocolLoss;
+        uint feeUSD = endProtocolLoss.sub(startProtocolLoss);
         fee =  getAssetAmt(feeUSD,_price);
     }
 
