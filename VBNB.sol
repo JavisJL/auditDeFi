@@ -14,6 +14,11 @@ pragma solidity ^0.5.16;
 // PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+// 0x022d21035c00594bdFBdAf77bEF76BBCe597d876,0x301e4668d64D36B4F78A6D6d0BbE4AC07315EA2D,1000000000000000000,"Dual Pool BNB","dBNB",18,0x250642F2860532610f1B0CF867420a7633819b26
+// Jan 23: 0x022d21035c00594bdFBdAf77bEF76BBCe597d876,0x512840238f0eE89DF29Ff9B287af6Fa0cA4B3f5D,0xa2fa8d78C92c6bE357Ae1b030c54FBa70B4eFC88,1000000000000000000,"Dual Pool BNB","dBNB",18,0x250642F2860532610f1B0CF867420a7633819b26
+
+// Jan 31: 0x022d21035c00594bdFBdAf77bEF76BBCe597d876,0x512840238f0eE89DF29Ff9B287af6Fa0cA4B3f5D,0xa2fa8d78C92c6bE357Ae1b030c54FBa70B4eFC88,1000000000000000000,"Dual Pool BNB","dBNB",18,0x250642F2860532610f1B0CF867420a7633819b26
+
 import "./VToken.sol";
 
 
@@ -209,7 +214,7 @@ contract dBNB is VToken {
 
         // calculates valueOut and updates balances
         (uint256 mintiUSD, uint256 reserveTradeFee,) = amountsOut(address(this), address(0), msg.value, msg.sender, referrer); // amountOut USD
-        iUSDbalance = iUSDbalance - int(mintiUSD); // updates global variables
+        iUSDbalance = subINT(iUSDbalance,int(mintiUSD)); // updates global variables
 
         VTokenInterface(dTokenOut).sendTokenOut(mintiUSD, _minOut, _sendTo, _deadline); 
 
@@ -217,7 +222,7 @@ contract dBNB is VToken {
         if (referrer != address(0)) {
             doTransferOut(referrer,reserveTradeFee);
         } else {
-            totalReserves = totalReserves + reserveTradeFee; // trading fee in underlying
+            totalReserves = addUINT(totalReserves,reserveTradeFee); // trading fee in underlying
         }
 
         require(iUSDrate() > int(-iUSDlimit),"sell would exceed iUSD limit.");
