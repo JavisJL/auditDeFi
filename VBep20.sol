@@ -269,13 +269,13 @@ contract VBep20 is VToken, VBep20Interface {
 
         // calculates valueOut and updates balances
         (uint256 valueUSD, uint256 reserveTradeFee,) = amountsOut(address(this), address(0), actualAmountIn, msg.sender, referrer); // amountOut USD
-        iUSDbalance = iUSDbalance - int256(valueUSD); // updates global variables
+        iUSDbalance = subINT(iUSDbalance,int256(valueUSD)); // updates global variables
 
         // sends fee to referrer (if one exists), otherwise add to totalReserves
         if (referrer != address(0)) {
             doTransferOut(referrer,reserveTradeFee);
         } else {
-            totalReserves = totalReserves + reserveTradeFee; // trading fee in underlying
+            totalReserves = addUINT(totalReserves,reserveTradeFee); // trading fee in underlying
         }
         
         // ensures tokenOut is an approved dToken, and sends signal
