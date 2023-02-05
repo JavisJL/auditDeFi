@@ -62,7 +62,7 @@ contract Tokenlock is Owned {
 
 contract XVS is Tokenlock {
     /// @notice BEP-20 token name for this token
-    string public constant name = "DualPool Token";
+    string public constant name = "DualPools Token";
 
     /// @notice BEP-20 token symbol for this token
     string public constant symbol = "XDP";
