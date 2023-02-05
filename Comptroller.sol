@@ -1513,7 +1513,7 @@ contract CompDP is ComptrollerV8Storage, ComptrollerInterfaceG2, ComptrollerErro
      * @return The address of XDP
      */
     function getXDPAddress() public pure returns (address) {
-        return 0x8549708b7c8dfAab00B5c5B97E483Caf008e4665;  
+        return 0xD49a93d991ACE4bEf0A7f9F665E38e902110f4C1;  
     }
 
 
