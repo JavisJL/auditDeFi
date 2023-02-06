@@ -1464,7 +1464,17 @@ contract VToken is VTokenInterface, Exponential, TokenErrorReporter {
      */
     function subINT(int256 a, int256 b) internal pure returns (int256) {
         int256 c = a - b;
-        require((b >= 0 && c <= a) || (b < 0 && c > a), "!sub overflow");
+        require((b >= 0 && c <= a) || (b < 0 && c > a), "!sub");
+
+        return c;
+    }
+
+    /**
+     * @dev Adds two signed integers, reverts on overflow.
+     */
+    function addINT(int256 a, int256 b) internal pure returns (int256) {
+        int256 c = a + b;
+        require((b >= 0 && c >= a) || (b < 0 && c < a), "!add");
 
         return c;
     }
@@ -1472,7 +1482,7 @@ contract VToken is VTokenInterface, Exponential, TokenErrorReporter {
 
     function addUINT(uint256 a, uint256 b) internal pure returns (uint256) {
         uint256 c = a + b;
-        require(c >= a, "!add overflow");
+        require(c >= a, "!add");
 
         return c;
     }
@@ -1513,7 +1523,6 @@ contract VToken is VTokenInterface, Exponential, TokenErrorReporter {
      */
     function removeAmountMinusFee(uint removeAmt) public view returns(uint newAmt) {
         newAmt = tradeModel.newRemoveLiquidityAmt(removeAmt, iUSDbalance, getCashPrior(), getPriceToken());
-        require(newAmt <= removeAmt,"!removeAmountMinusFee");
     }
 
 
@@ -1578,7 +1587,7 @@ contract VToken is VTokenInterface, Exponential, TokenErrorReporter {
 
         // calculates tokenOut and updates balances
         (uint256 sendTokenOutAmt, uint256 reserveTradeFee,) = amountsOut(address(0), address(this), _valueIn, _sendTo,address(0)); // amountOut this token 
-        iUSDbalance = subINT(iUSDbalance,int256(_valueIn)); // update global variables
+        iUSDbalance = addINT(iUSDbalance,int256(_valueIn)); // update global variables
         totalReserves = addUINT(totalReserves,reserveTradeFee); // trading fee in underlying
 
         // check sufficient balance and transfers token out
