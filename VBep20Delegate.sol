@@ -26,7 +26,7 @@ contract VBep20Delegate is VBep20, VDelegateInterface {
             implementation = address(0);
         }
 
-        require(msg.sender == admin, "!admin _becomeImplementation");
+        require(msg.sender == admin, "_becomeImplementation");
     }
 
     /**
@@ -38,7 +38,7 @@ contract VBep20Delegate is VBep20, VDelegateInterface {
             implementation = address(0);
         }
 
-        require(msg.sender == admin, "!admin _resignImplementation");
+        require(msg.sender == admin, "_resignImplementation");
 
     }
 }
