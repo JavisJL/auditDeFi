@@ -57,12 +57,6 @@ contract TrendTokenStorage {
 
 
     /**
-     * @notice Emitted when referral reward changed
-     
-    event SetReferralReward(uint oldReward, uint newReward);
-    */
-
-    /**
      * @notice Emitted when max disable value changed
      */
     event MaxDisableValue(uint oldValue, uint newValue);
