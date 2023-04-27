@@ -308,7 +308,7 @@ contract CompTT is ComptrollerStorage {//}, ComptrollerErrorReporter, Exponentia
                 return true;
             }
         }
-        return true;
+        return false;
     } 
 
 
