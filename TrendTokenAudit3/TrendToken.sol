@@ -239,9 +239,7 @@ contract TrendToken is DualPoolIntegration, TrendTokenStorage {
      */
     function _setReferralReward(uint _referralReward) onlyManager external {
         require(_referralReward <= 0.50e18,"!_setReferralReward");
-        //uint oldReward = referralReward;
         referralReward = _referralReward;
-        //emit SetReferralReward(oldReward, referralReward);
     }
     
 
@@ -414,7 +412,6 @@ contract TrendToken is DualPoolIntegration, TrendTokenStorage {
     function _disableToken(IERC20 _bep20, uint[] calldata _allocations) onlyTradingBot external {
         IVBep20 dToken = dTokenSupportedRequire(_bep20);
         require(_bep20 != wbnb && tokenEquityVal(dToken) < maxDisableTokenValue,"!BNB or !maxVal");
-        //require(tokenEquityVal(dToken) < maxDisableTokenValue,"token val exceeded.");
         checkActiveToken(dToken);
         compDP.claimXDP(address(this));
         disableCol(dToken);
@@ -477,21 +474,6 @@ contract TrendToken is DualPoolIntegration, TrendTokenStorage {
         require(_redeemAmountXDP <= balanceXDP(),"!XDP balance");
         xdp.safeTransfer(feeRecipient,_redeemAmountXDP);
     }
-
-    /** ADD BACK MAYBE
-     * @notice Allows trading bot to swap XDP for BNB
-     * @dev Limited to the amount of XDP owned by the pool (balance-reserves)
-     
-    function _swapXDPforBNB(uint _sellAmountXDP, uint _minOut) external onlyTradingBot {
-        require(_sellAmountXDP <= balanceXDP(),"!XDP balance");
-        address[] memory _path = Lib.pathGenerator2(address(xdp), address(wbnb));
-        xdp.approve(address(pancakeRouter), _sellAmountXDP);
-        uint[] memory amounts = pancakeRouter.swapExactTokensForETH(_sellAmountXDP,  _minOut, _path, address(this), block.timestamp);
-        amounts[amounts.length.sub(1)];
-    }
-    */
-    
-    
 
 
     // ------ EXTERNAL VIEW FUNCTIONS ------------- //
