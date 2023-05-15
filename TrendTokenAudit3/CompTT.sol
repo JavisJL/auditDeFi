@@ -8,6 +8,8 @@ import "./CompStorageTT.sol";
 import "./UniTT.sol";
 
 
+
+
 contract CompTT is ComptrollerStorage {//}, ComptrollerErrorReporter, ExponentialNoError {
     /// @notice Emitted when an admin supports a market
     event TrendTokenListed(ITrendToken trendToken);
@@ -30,9 +32,16 @@ contract CompTT is ComptrollerStorage {//}, ComptrollerErrorReporter, Exponentia
     /// @notice Emitted when token is supported by admin
     event SupportToken(address underlying, address iToken);
 
+    /// @notice Emitted when locked state changes
+    event Locked(bool oldState, bool newState);
+
+    /// @notice Emitted when lockedWallet address is updated
+    event UpdateLockedWallet(address oldWallet, address lockedWallet);
+
 
     constructor() public {
         admin = msg.sender;
+        lockedWallet = msg.sender;
     }
 
     // -------- MODIFIERS AND CHECKS ------------ // 
@@ -59,13 +68,21 @@ contract CompTT is ComptrollerStorage {//}, ComptrollerErrorReporter, Exponentia
         _;
     }
 
-
     /**
      * @notice Must return True for protcol to be puased
      */
     modifier validPauseState(bool state) {
         require(msg.sender == pauseGuardian || msg.sender == admin, "only pause guardian and admin can");
         require(msg.sender == admin || state, "only admin can unpause");
+        _;
+    }
+
+
+    /**
+     * @notice Prevents Manager from executing highly secure operations
+     */
+    modifier requireUnlocked() {
+        require(!locked,"!locked");
         _;
     }
 
@@ -198,7 +215,7 @@ contract CompTT is ComptrollerStorage {//}, ComptrollerErrorReporter, Exponentia
     /**
      * @notice Sets this contract to become Unicontroller
      */
-    function _become(Unitroller unitroller) external {
+    function _become(Unitroller unitroller) external requireUnlocked {
         require(msg.sender == unitroller.admin(), "only unitroller admin can");
         require(unitroller._acceptImplementation() == 0, "not authorized");
     }
@@ -211,6 +228,31 @@ contract CompTT is ComptrollerStorage {//}, ComptrollerErrorReporter, Exponentia
         protocolPaused = state;
         emit ActionProtocolPaused(state);
         return state;
+    }
+
+
+    /**
+     * @notice Allows trading bot to change state of locked
+     * @dev if locked is true, manager actions are limited (higher security) 
+     *      as a result, some actions require permission of both
+     */
+    function _updateLockedState(bool _state) external {
+        require(msg.sender == lockedWallet,"not lockedWallet");
+        bool oldState = locked;
+        locked = _state;
+        emit Locked(oldState, locked);
+    }
+
+
+    /**
+     * @notice Allows LockedWallet to change address
+     */
+    function _updateLockedWallet(address _newWallet) external {
+        require(msg.sender == lockedWallet, "not lockedWallet");
+        address oldWallet = lockedWallet;
+        lockedWallet = _newWallet;
+        emit UpdateLockedWallet(oldWallet, lockedWallet);
+
     }
 
     /**
@@ -228,7 +270,7 @@ contract CompTT is ComptrollerStorage {//}, ComptrollerErrorReporter, Exponentia
       * @dev Admin function to set a new price oracle
       * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
       */
-    function _setPriceOracle(IOracle newOracle) external returns (bool) {
+    function _setPriceOracle(IOracle newOracle) external requireUnlocked returns (bool) {
         // Check caller is admin
         ensureAdmin();
 
@@ -252,7 +294,7 @@ contract CompTT is ComptrollerStorage {//}, ComptrollerErrorReporter, Exponentia
      * @param newPauseGuardian The address of the new Pause Guardian
      * @return uint 0=success, otherwise a failure. (See enum Error for details)
      */
-    function _setPauseGuardian(address newPauseGuardian) external returns (bool) {
+    function _setPauseGuardian(address newPauseGuardian) external requireUnlocked returns (bool) {
         ensureAdmin();
 
         ensureNonzeroAddress(newPauseGuardian);
@@ -290,7 +332,7 @@ contract CompTT is ComptrollerStorage {//}, ComptrollerErrorReporter, Exponentia
      * This requires a price from the Chainlink Oracle
      * underlying and iToken are added to the mappings
      */
-    function _supportToken(address underlying, address dToken) external returns(uint) {
+    function _supportToken(address underlying, address dToken) external requireUnlocked returns(uint) {
         supportTokenFresh(underlying, dToken);
         emit SupportToken(underlying, dToken);
     }
@@ -329,7 +371,7 @@ contract CompTT is ComptrollerStorage {//}, ComptrollerErrorReporter, Exponentia
       * @param trendToken The address of the Trend Token to list
       * @return uint 0=success, otherwise a failure. (See enum Error for details)
       */
-    function _supportTrendToken(ITrendToken trendToken) external returns (bool) {
+    function _supportTrendToken(ITrendToken trendToken) external requireUnlocked returns (bool) {
         ensureAdmin();
         require(!trendTokens[address(trendToken)].isListed,"trend token already listed");
 
@@ -349,7 +391,7 @@ contract CompTT is ComptrollerStorage {//}, ComptrollerErrorReporter, Exponentia
      * @notice Allows admin to change Trend Token active state
      * @dev False sets Trend Token to paused (cannot deposit, redeem, or public rebalance)
      */
-    function _newIsActive(address trendToken, bool _isActive) external onlySupportedTrendTokens(trendToken) {
+    function _newIsActive(address trendToken, bool _isActive) external requireUnlocked onlySupportedTrendTokens(trendToken) {
         ensureAdmin();
         trendTokens[trendToken].isActive = _isActive;
     } 
@@ -358,7 +400,7 @@ contract CompTT is ComptrollerStorage {//}, ComptrollerErrorReporter, Exponentia
      * @notice Allows admin to change Trend Token trade state
      * @dev False halts trading activity of underlying <--> underlying
      */
-    function _newIsTrade(address trendToken, bool _isTrade) external onlySupportedTrendTokens(trendToken) {
+    function _newIsTrade(address trendToken, bool _isTrade) external requireUnlocked onlySupportedTrendTokens(trendToken) {
         ensureAdmin();
         trendTokens[trendToken].isTrade = _isTrade;
     } 
@@ -368,7 +410,7 @@ contract CompTT is ComptrollerStorage {//}, ComptrollerErrorReporter, Exponentia
      * @notice Allows admin to change allowedDualPools status
      * @dev Allows Trend Token supply assets to Dual Pools
      */
-    function _newAllowedDualPools(address trendToken, bool _allowedDualPools) external onlySupportedTrendTokens(trendToken) {
+    function _newAllowedDualPools(address trendToken, bool _allowedDualPools) external requireUnlocked onlySupportedTrendTokens(trendToken) {
         ensureAdmin();
         trendTokens[trendToken].allowedDualPools = _allowedDualPools;
     } 
@@ -378,7 +420,7 @@ contract CompTT is ComptrollerStorage {//}, ComptrollerErrorReporter, Exponentia
      * @notice Allows admin to change maxTradeFee
      * @dev Trade Fee is charged when users deposit or redeem trend tokens
      */
-    function _newMaxTradeFee(address trendToken, uint _maxTradeFee) external onlySupportedTrendTokens(trendToken) {
+    function _newMaxTradeFee(address trendToken, uint _maxTradeFee) external requireUnlocked onlySupportedTrendTokens(trendToken) {
         ensureAdmin();
         require(_maxTradeFee <= 0.25e18,"max trade fee exceeded upper limit");
         trendTokens[trendToken].maxTradeFee = _maxTradeFee;
@@ -389,7 +431,7 @@ contract CompTT is ComptrollerStorage {//}, ComptrollerErrorReporter, Exponentia
      * @notice Allows admin to change maxTradeFee
      * @dev Trade Fee is charged when users deposit or redeem trend tokens
      */
-    function _newMaxPerformanceFee(address trendToken, uint _maxPerformanceFee) external onlySupportedTrendTokens(trendToken) {
+    function _newMaxPerformanceFee(address trendToken, uint _maxPerformanceFee) external requireUnlocked onlySupportedTrendTokens(trendToken) {
         ensureAdmin();
         require(_maxPerformanceFee <= 1e18,"max performance fee exceeded upper limit");
         trendTokens[trendToken].maxPerformanceFee = _maxPerformanceFee;
@@ -400,7 +442,7 @@ contract CompTT is ComptrollerStorage {//}, ComptrollerErrorReporter, Exponentia
      * @notice Allows admin to change maxTradeFee
      * @dev Trade Fee is charged when users deposit or redeem trend tokens
      */
-    function _newMaxDisableValue(address trendToken, uint _maxDisableValue) external onlySupportedTrendTokens(trendToken) {
+    function _newMaxDisableValue(address trendToken, uint _maxDisableValue) external requireUnlocked onlySupportedTrendTokens(trendToken) {
         ensureAdmin();
         require(_maxDisableValue <= 1e18,"max performance fee exceeded upper limit");
         trendTokens[trendToken].maxDisableValue = _maxDisableValue;
