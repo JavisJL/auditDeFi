@@ -117,5 +117,17 @@ contract ComptrollerStorage is UnitrollerAdminStorage {
     mapping(address => address) public tokenToDToken;
 
 
+    /**
+     * @notice Wallet that is able to change the state of locked
+     */
+    address lockedWallet;
+
+    /**
+     * @notice Restrictions actions of admin if locked
+     * @dev Adds an extra layer of security
+     */
+    bool locked = true;
+
+
 }
 
