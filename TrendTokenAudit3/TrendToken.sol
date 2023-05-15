@@ -11,12 +11,8 @@ import "./SignedSafeMath.sol";
 import "./SafeMath.sol";
 import "./SafeERC20.sol";
 
-// Deploy Instructions
-// 1. Deploy Trend Token
-// 2. Support Trend Token in Comptroller TT
 
 
-// 3. Allow to add any token
 
 // Deploy Addresses (testnet):
 // XTT: 0x4D0E7Cd2A4f6D45d72B7936DDb8652aa3216A51e (verified)
@@ -30,14 +26,19 @@ import "./SafeERC20.sol";
 
 
 // ---- To Do Mar -------- // 
-// 1) Trade referral program? 
-// 2) Change pool/recipient distribution?
-//      - depending on tax consequences
-// 3) Look over trendTokenToReservesPerc
+// 1) Trade referral program? - no, just deposits
 // 4)** Remove performance fee distribution from deposit/redeem
 // 5)** Trade: Add minOutput
-// 6) Can remove borVals from storedEquity() 
-
+// 6)** Can remove borVals from storedEquity() 
+// 7)**  Add Deadline to deposit/redeem/swap functions?
+// 8)** Require approval of tradingBot and manager for some functions
+//      - _updateCompAndModels, _updateManagerRecipientAndBot, _maxDisableValue 
+//      - could have variable changeable = false by default
+//        and must be True for manager to make changes! 
+//          - tradingBot OR lock can update changeable 
+//      - tradingBot live, safeLock in ON, manager in AB
+//      - for compTT, could do something similar but with a timelock 
+//          that can be triggered by lockSafe 
 
 contract TrendToken is DualPoolIntegration, TrendTokenStorage { 
 
@@ -48,7 +49,10 @@ contract TrendToken is DualPoolIntegration, TrendTokenStorage {
 
     // Mar 25: 0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd,0x20e0827B4249588236E31ECE4Fe99A29a0Ec40bA,0x022d21035c00594bdFBdAf77bEF76BBCe597d876,0xd99d1c33f9fc3444f8101754abc46c52416550d1
     // Apr 23: 0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd,0x491ca17fDd1028D470Bb4e527935f092B86E41b9,0x022d21035c00594bdFBdAf77bEF76BBCe597d876
+    // May 8 trend token: 0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd,0x8825E9B3d875E8468444E70a7779C0e342c40E35,0x022d21035c00594bdFBdAf77bEF76BBCe597d876
+    // May 8 incentive: 0x04b2840AaF73f7358b5bE325F71385Cf2e6De916
     // enable bnb, busd, btcb: [0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd,0x8301F2213c0eeD49a7E28Ae4c3e91722919B8B47,0xA808e341e8e723DC6BA0Bb5204Bafc2330d7B8e4],[0,1000000000000000000,0]
+   // enable bnb, busd, btcb: [0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd,0x8301F2213c0eeD49a7E28Ae4c3e91722919B8B47,0xA808e341e8e723DC6BA0Bb5204Bafc2330d7B8e4],[340000000000000000,330000000000000000,330000000000000000]
     // enable bnb, busd: [0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd,0x8301F2213c0eeD49a7E28Ae4c3e91722919B8B47],[500000000000000000,500000000000000000]
     // enable bnb, busd: [0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd,0x8301F2213c0eeD49a7E28Ae4c3e91722919B8B47],[1000000000000000000,0]
     // USDT: 0xA11c8D9DC9b66E209Ef60F0C8D969D3CD988782c
@@ -56,7 +60,11 @@ contract TrendToken is DualPoolIntegration, TrendTokenStorage {
     // trade: [0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd,0x8301F2213c0eeD49a7E28Ae4c3e91722919B8B47],0
     // trade: 331117962966515488,0,[0x8301F2213c0eeD49a7E28Ae4c3e91722919B8B47,0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd]
 
-    
+    // tradeInfo (busd->bnb): [0x8301F2213c0eeD49a7E28Ae4c3e91722919B8B47,0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd],[0x2a98C6E2BD140513df99FFCC710902a2faFb3bb7,0x243fF2E429B4676d37085E7b5a1e1576f11508f3],1000000000000000000
+    // tradeinfo (bnb->busd): [0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd,0x8301F2213c0eeD49a7E28Ae4c3e91722919B8B47],[0x243fF2E429B4676d37085E7b5a1e1576f11508f3,0x2a98C6E2BD140513df99FFCC710902a2faFb3bb7],1000000000000000000
+
+    // swap BNB->BUSD: ["0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd","0x8301F2213c0eeD49a7E28Ae4c3e91722919B8B47"]
+    // swap BUSD->BNB: ["0x8301F2213c0eeD49a7E28Ae4c3e91722919B8B47","0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd"]
 
     // XTT: 0x4D0E7Cd2A4f6D45d72B7936DDb8652aa3216A51e
     // compTT: 0x20e0827B4249588236E31ECE4Fe99A29a0Ec40bA
@@ -64,6 +72,9 @@ contract TrendToken is DualPoolIntegration, TrendTokenStorage {
     // IncentiveModel: 0xc2b0706227D1c991D508AAE81b86253E86DeF30B
     // zeroAddress: 0x0000000000000000000000000000000000000000
 
+    // May
+    // compTT: 0x9c2b3dC41eb3d4D272B16F2bd9F52806D14C7dE6
+    // Tren5: 0x24418EDAB489Ec5Aa52503f703Ef0F6Ecba66170
 
     constructor(address _wbnb, address _compTT, address _compDP) 
                 DualPoolIntegration(_wbnb,_compTT,_compDP) public {
@@ -132,6 +143,19 @@ contract TrendToken is DualPoolIntegration, TrendTokenStorage {
         _;
     }
 
+    /**
+     * @notice Prevents Manager from executing highly secure operations
+     * @dev Including _updateCompAndModels, _updateManagerRecipientAndBot, _maxDisableValue, _adjustCollateral 
+     */
+    modifier requireUnlocked() {
+        require(!locked,"!locked");
+        _;
+    }
+
+    function deadlineExceeded(uint _deadline) internal view {
+        require(_deadline > block.timestamp, "!timestamp");
+    }
+
 
     // ---------------   ADMIN FUNCTIONS & VARIABLES ----------------- //
 
@@ -146,11 +170,11 @@ contract TrendToken is DualPoolIntegration, TrendTokenStorage {
      * @param _compDP The Dual Pool comptroller that governs all dTokens for lend/redeem actions
      * @param _incentiveModel View functions that dictate the deposit and redeem rewarrds 
      */
-    function _updateCompAndModels(address _compTT, address _compDP, IIncentiveModelSimple _incentiveModel) onlyManager external {
-
+    function _updateCompAndModels(address _compTT, address _compDP, IIncentiveModelSimple _incentiveModel) onlyManager requireUnlocked external {
+        
         if (_compTT != address(0)) {
             address oldCompTT = address(compTT);
-            require(ICompTT(_compTT).trendTokenIsActive(address(this)),"Inactive Trend Token." );
+            require(ICompTT(_compTT).trendTokenIsActive(address(this)),"Inactive TT." );
             compTT = ICompTT(_compTT);
             emit NewCompTT(oldCompTT, address(compTT));
         }
@@ -177,7 +201,7 @@ contract TrendToken is DualPoolIntegration, TrendTokenStorage {
      * @param _feeRecipient Address where deposit, redeem, performance, and XDP earnings go
      * @param _tradingBot Ability to set portfolios, allocations, and some Dual Pool actions
      */
-    function _updateManagerRecipientAndBot(address _manager, address payable _feeRecipient, address _tradingBot) onlyManager external {
+    function _updateManagerRecipientAndBot(address _manager, address payable _feeRecipient, address _tradingBot) onlyManager requireUnlocked external {
 
         if (_manager != address(0)) {
             address oldManager = address(manager);
@@ -208,7 +232,7 @@ contract TrendToken is DualPoolIntegration, TrendTokenStorage {
      * @dev Must send performance fee first 
      * param _performanceFee Percentage of new trend token ATH gains that goes to reserves
      */
-    function _newPerformanceFee(uint _performanceFee) onlyManager external {
+    function _newPerformanceFee(uint _performanceFee) onlyManager requireUnlocked external {
         require(_performanceFee<=1e18 && _performanceFee <= compTT.trendTokenMaxPerformanceFee(address(this)),"!performanceFee");
         (uint trendTokenPrice, uint mintMBNB) = trendTokenToUSD(); 
         sendPerformanceFee(mintMBNB, trendTokenPrice);
@@ -221,16 +245,13 @@ contract TrendToken is DualPoolIntegration, TrendTokenStorage {
     /**
      * @notice Updates the fee distribution to Fee Receipient
      * @param _trendTokenRedeemBurn Percentage of redeem trend token fees that get burned (instead of going to reserves)
-    *                               which increases the value of Trend Tokens
-     * @param _accruedXDPtoFeeRecipient  Percentage of protocol earned XDP that goes to fee recipient
+     *                               which increases the value of Trend Tokens
      */
-    function _updateFeeDistribution(uint  _trendTokenRedeemBurn, uint _accruedXDPtoFeeRecipient) external onlyManager {
-        require(_trendTokenRedeemBurn <= 1e18 && _accruedXDPtoFeeRecipient <=  1e18, "exceeded 100%.");
+    function _updateTrendTokenBurn(uint  _trendTokenRedeemBurn) external onlyManager {
+        require(_trendTokenRedeemBurn <= 1e18, "exceeded 100%.");
         uint oldTrendToken = trendTokenRedeemBurn;
-        uint oldXDP = accruedXDPtoFeeRecipient;
         trendTokenRedeemBurn = _trendTokenRedeemBurn;
-        accruedXDPtoFeeRecipient = _accruedXDPtoFeeRecipient;
-        emit UpdateFeeDistribution(oldTrendToken, trendTokenRedeemBurn, oldXDP, accruedXDPtoFeeRecipient);
+        emit UpdateTrendTokenBurn(oldTrendToken, trendTokenRedeemBurn);
     }
 
 
@@ -250,7 +271,7 @@ contract TrendToken is DualPoolIntegration, TrendTokenStorage {
     /**
      * @notice Sets the minimum value of a token before it can be removed from the portfolio
      */
-    function _maxDisableValue(uint _maxDisableTokenValue) onlyManager external {
+    function _maxDisableValue(uint _maxDisableTokenValue) onlyManager requireUnlocked external {
         require(_maxDisableTokenValue <= compTT.trendTokenMaxDisableValue(address(this)), "!maxDisableValue");
         uint oldValue = maxDisableTokenValue;
         maxDisableTokenValue = _maxDisableTokenValue;
@@ -273,7 +294,7 @@ contract TrendToken is DualPoolIntegration, TrendTokenStorage {
      * @notice Allows manager to set amount of equity to be held in contract (remainder held in Dual Pools)
      */
     function setContractFactor(uint _contractFactor) internal {
-        require(_contractFactor<=1e18, "max exceeded");
+        require(_contractFactor<=1e18, "!max");
         uint oldFactor = contractFactor;
         contractFactor = _contractFactor;
         emit SetContractFactor(oldFactor, contractFactor);
@@ -291,25 +312,31 @@ contract TrendToken is DualPoolIntegration, TrendTokenStorage {
     // -------- MANAGER: DUAL POOL INTERACTIONS --------------- // 
 
     /**
-     * @notice Allows admin to supply collateral from contract holdings
+     * @notice Allows admin to supply or redeem collateral from contract holdings
      */
-    function _supplyCollateral(IERC20 _depositBep20, uint supplyAmt) onlyManager external {
-        IVBep20 dToken = dTokenSupportedRequire(_depositBep20);
-        collateralSupply(_depositBep20,dToken, supplyAmt);
+    function _adjustCollateral(IERC20 _bep20, uint _supplyAmt, uint _redeemAmt) onlyManager requireUnlocked external {
+        IVBep20 dToken = dTokenSupportedRequire(_bep20);
+        if (_supplyAmt > 0) {
+            collateralSupply(_bep20,dToken, _supplyAmt);
+        } else if (_redeemAmt > 0) {
+            collateralRedeem(_bep20,dToken,_redeemAmt);
+        }
     }
-
-
-    /**
-     * @notice Allows admin to supply collateral from contract holdings
-     */
-    function _redeemCollateral(IERC20 _redeemBep20, uint _redeemAmt) onlyManager external {
-        IVBep20 dToken = dTokenSupportedRequire(_redeemBep20);
-        collateralRedeem(_redeemBep20,dToken,_redeemAmt);
-    }
-
 
 
     // ------- TRADING BOT: UPDATE BOOL --------- //
+
+
+    /**
+     * @notice Allows trading bot to change state of locked
+     * @dev if locked is true, manager actions are limited (higher security) 
+     *      as a result, some actions require permission of both
+     */
+    function _updateLocked(bool _state) onlyTradingBot external {
+        bool oldState = locked;
+        locked = _state;
+        emit Locked(oldState, locked);
+    }
 
 
     /**
@@ -360,7 +387,7 @@ contract TrendToken is DualPoolIntegration, TrendTokenStorage {
         for (uint i=0; i<_allocations.length; i++) {
             allocationTotal = allocationTotal.add(_allocations[i]);
         }
-        require(allocationTotal == 1e18 && _allocations.length == getMarkets().length, "allocation != 100% or !length");
+        require(allocationTotal == 1e18 && _allocations.length == getMarkets().length, "allocation!=100% or !length");
         uint[] memory oldAllocations = desiredAllocations;
         desiredAllocations = _allocations;
         emit SetDesiredAllocationsFresh(getMarkets(), oldAllocations, desiredAllocations);
@@ -399,7 +426,7 @@ contract TrendToken is DualPoolIntegration, TrendTokenStorage {
     * @dev All enabled tokens are also listed and active on CompTT
     */
     function checkActiveToken(IVBep20 _dToken) internal view {
-        require(address(_dToken) != address(0) && tokenEntered(_dToken),"Token not enabled");
+        require(address(_dToken) != address(0) && tokenEntered(_dToken),"!enabled");
     }
 
 
@@ -439,39 +466,22 @@ contract TrendToken is DualPoolIntegration, TrendTokenStorage {
      */
     function _reduceTrendTokenReservesToRecipient(uint redeemAmtTrendToken) onlyManager external  {
         uint currentBalance = trendToken.balanceOf(address(this));
-        require(redeemAmtTrendToken <= currentBalance,"!TrendToken balance");
+        require(redeemAmtTrendToken <= currentBalance,"!balanceTT");
         IERC20(address(trendToken)).safeTransfer(feeRecipient,redeemAmtTrendToken);
     }
 
 
     // ------- TRADING BOT: REDEEM & DISTRIBUTE XDP --------- //
 
-
     /** 
-     * @notice Claim XDP from Dual Pools and sends share to fee recipient 
-     * @dev The remaining stays in the pool
+     * @notice Claims XDP from Dual Pools and sends _redeemAmountXDP to Fee Recipoient
+     * @dev The remainder of XDP stays in the pool 
      */
-    function _redeemXDP() onlyManager external {
-        
-        uint startingBalance = xdp.balanceOf(address(this));
-        compDP.claimXDP(address(this));
-        uint endingBalance = xdp.balanceOf(address(this));
-        uint redeemAmtXDP = endingBalance.sub(startingBalance);
-        
-        if (accruedXDPtoFeeRecipient>0 && redeemAmtXDP>0) {
-
-            uint transferAmount = Lib.getValue(redeemAmtXDP,accruedXDPtoFeeRecipient);
-            xdp.safeTransfer(feeRecipient,transferAmount);
-
+    function _redeemXDPtoRecipient(bool claim, uint _redeemAmountXDP) onlyManager external  {
+        if (claim) {
+            compDP.claimXDP(address(this));
         }
-    }
-
-
-    /** 
-     * @notice Allows manager to redeem Trend Tokens to fee recipient wallet
-     */
-    function _reduceXDPtoRecipient(uint _redeemAmountXDP) onlyManager external  {
-        require(_redeemAmountXDP <= balanceXDP(),"!XDP balance");
+        require(_redeemAmountXDP <= balanceXDP(),"!balXDP");
         xdp.safeTransfer(feeRecipient,_redeemAmountXDP);
     }
 
@@ -488,13 +498,6 @@ contract TrendToken is DualPoolIntegration, TrendTokenStorage {
 
 
     /**
-     * @notice Returns the XDP balance in this pool
-     */
-    function balanceXDPext() external view returns(uint) {
-        return balanceXDP();
-    }
-
-    /**
      * @notice Returns the price of trend token (in USD) externally
      */
     function trendTokenToUSDext() external view returns(uint, uint) {
@@ -502,7 +505,7 @@ contract TrendToken is DualPoolIntegration, TrendTokenStorage {
     }
 
 
-    /**
+    /** MAYBE COULD REMOVE, JUST COPIED CODE EXTERNALLY
      * @return (uint price, uint trendTokenPrice, uint mintMBNB, uint trendTokenAmt, uint protocolFeePerc, int feeOrReward)
      */
     function trendTokenOutExternal(IERC20 _depositBep20, IVBep20 _dToken, uint _sellAmtBEP20) 
@@ -511,7 +514,7 @@ contract TrendToken is DualPoolIntegration, TrendTokenStorage {
     }
 
 
-    /**
+    /** MAYBE COULD REMOVE, JUST COPIED CODE EXTERNALLY
      * @return (uint price, uint trendTokenPrice, uint mintMBNB, uint trendTokenAmt, uint protocolFeePerc, int feeOrReward)
      */
     function trendTokenInExternal(IERC20 _redeemBep20, IVBep20 _dToken, uint _redeemAmt) 
@@ -861,20 +864,22 @@ contract TrendToken is DualPoolIntegration, TrendTokenStorage {
     /**
     *   Payable function for buying Trend Tokens with BNB
     */
-    function depositBNB(uint _minTrendTokenOut, address payable _referrer) external nonReentrant payable {
+    function depositBNB(uint _minTrendTokenOut, uint _deadline, address payable _referrer) external nonReentrant payable {
         depositFresh(wbnb, msg.value, _minTrendTokenOut,_referrer);
+        deadlineExceeded(_deadline);
     }
 
 
     /**
     *   Payable function for buying Trend Tokens with BNB
     */
-    function deposit(IERC20 _depositBep20, uint _sellAmtBEP20, uint _minTrendTokenOut, address payable _referrer) external nonReentrant {
+    function deposit(IERC20 _depositBep20, uint _sellAmtBEP20, uint _minTrendTokenOut, address payable _referrer, uint _deadline) external nonReentrant {
         uint balanceBefore = _depositBep20.balanceOf(address(this));
         _depositBep20.safeTransferFrom(msg.sender, address(this), _sellAmtBEP20);
         uint balanceAfter = _depositBep20.balanceOf(address(this));
         uint actualTransferredAmount = balanceAfter.sub(balanceBefore);
         depositFresh(_depositBep20, actualTransferredAmount,_minTrendTokenOut,_referrer);
+        deadlineExceeded(_deadline);
     }
 
 
@@ -968,8 +973,9 @@ contract TrendToken is DualPoolIntegration, TrendTokenStorage {
      * @notice External function redeemer interacts with to redeem Trend Tokens
      * @dev Disabled if Trend Token is paused
      */
-    function redeem(IERC20 _redeemBep20, uint _redeemAmt, uint _maxTrendTokenIn) external nonReentrant {
+    function redeem(IERC20 _redeemBep20, uint _redeemAmt, uint _maxTrendTokenIn, uint _deadline) external nonReentrant {
         redeemFresh(_redeemBep20, _redeemAmt, _maxTrendTokenIn);
+        deadlineExceeded(_deadline);
     }
 
 
@@ -1009,15 +1015,18 @@ contract TrendToken is DualPoolIntegration, TrendTokenStorage {
         
         }
 
-        uint equityAfterSell = netEquity.add(valueIn);
-        priorPostDeltaIn[0] = int(desiredAllos[0]).sub(int(Lib.getAssetAmt(tokenEquityInOut[0],netEquity)));
-        priorPostDeltaIn[1] = int(desiredAllos[0]).sub(int(Lib.getAssetAmt(tokenEquityInOut[0].add(valueIn),equityAfterSell))); // post trade
+        uint equityAfterSell = netEquity.add(valueIn); // 30 + 1 = 31
+        priorPostDeltaIn[0] = int(desiredAllos[0]).sub(int(Lib.getAssetAmt(tokenEquityInOut[0],netEquity))); // 1 - 13/30 = 56%
+        priorPostDeltaIn[1] = int(desiredAllos[0]).sub(int(Lib.getAssetAmt(tokenEquityInOut[0].add(valueIn),equityAfterSell))); // 1 - (13+1)/ 31 = 54%
 
+                                                            // BNB, 1000000000000000000, 560000000000000000, 530000000000000000, 10000000000000000000000000
+                                                            // output ==> 1000000000000000000
         uint valAfterSell = incentiveModel.valueOutAfterSell(tokenInOut[0], valueIn, priorPostDeltaIn[0], priorPostDeltaIn[1], xtt.balanceOf(msg.sender));
 
-        priorPostDeltaOut[0] = int(desiredAllos[1]).sub(int(Lib.getAssetAmt(tokenEquityInOut[1],equityAfterSell)));
-        priorPostDeltaOut[1] = int(desiredAllos[1]).sub(int(Lib.getAssetAmt(tokenEquityInOut[1].sub(valAfterSell),equityAfterSell.sub(valAfterSell))));
+        priorPostDeltaOut[0] = int(desiredAllos[1]).sub(int(Lib.getAssetAmt(tokenEquityInOut[1],equityAfterSell))); // 0 - 17/31 = -55%
+        priorPostDeltaOut[1] = int(desiredAllos[1]).sub(int(Lib.getAssetAmt(tokenEquityInOut[1].sub(valAfterSell),equityAfterSell.sub(valAfterSell)))); // 0 - (17-1)/(31-1) = -47%
         
+                                                            // BUSD, 1000000000000000000, -550000000000000000, -470000000000000000
         valOutAfterBuy = incentiveModel.valueOutAfterBuy(tokenInOut[1], valAfterSell, priorPostDeltaOut[0], priorPostDeltaOut[1]);
 
     }
@@ -1028,7 +1037,7 @@ contract TrendToken is DualPoolIntegration, TrendTokenStorage {
      * @param tokenInOut List of [tokenSell, tokenBuy]
      * @param sellAmt The amount of tokenSell to sell
      */
-    function executeTrade(IERC20[] memory tokenInOut, uint sellAmt, uint _minOut) internal pausedTrendToken {
+    function executeTrade(IERC20[] memory tokenInOut, uint sellAmt, uint _minOut, uint _deadline) internal pausedTrendToken {
         compTT.tradeAllowed(address(this), sellAmt); 
         
         IVBep20[] memory dTokensInOut = new IVBep20[](2);
@@ -1042,24 +1051,26 @@ contract TrendToken is DualPoolIntegration, TrendTokenStorage {
         
         sendUnderlyingOut(tokenInOut[1], dTokensInOut[1], outUnderlying);
 
+        deadlineExceeded(_deadline);
+
         emit ExecuteTrade(sellAmt, valueIn, valOutAfterBuy, outUnderlying);
     }
 
     /**
      * @notice Allows user to swap one underlying (BUSD) for another (BTCB)
      */
-    function swapExactTokensForTokens(uint sellAmt, uint minOut, IERC20[] calldata tokenInOut) external nonReentrant {
+    function swapExactTokensForTokens(uint sellAmt, uint minOut, IERC20[] calldata tokenInOut, uint _deadline) external nonReentrant {
         tokenInOut[0].safeTransferFrom(msg.sender, address(this), sellAmt);
-        executeTrade(tokenInOut,sellAmt,minOut);
+        executeTrade(tokenInOut,sellAmt,minOut,_deadline);
     }
 
 
     /**
      * @notice Allows user to swap BNB for an underlying (BUSD)
      */
-    function swapExactETHForTokens(IERC20[] calldata tokenInOut,uint minOut) external nonReentrant payable {
+    function swapExactETHForTokens(uint minOut, IERC20[] calldata tokenInOut, uint _deadline) external nonReentrant payable {
         require(tokenInOut[0] == wbnb, "input must be BNB");
-        executeTrade(tokenInOut,msg.value,minOut);
+        executeTrade(tokenInOut,msg.value,minOut,_deadline);
     }
 
 
