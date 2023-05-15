@@ -53,7 +53,7 @@ contract TrendTokenStorage {
     /**
      * @notice Emitted when fee distribution changed
      */
-    event UpdateFeeDistribution(uint oldTrendToken,uint newTrendToken, uint oldXDP, uint newXDP);
+    event UpdateTrendTokenBurn(uint oldTrendToken,uint newTrendToken);
 
 
     /**
@@ -93,6 +93,11 @@ contract TrendTokenStorage {
      */
     event ExecuteTrade(uint amountIn, uint valueIn, uint valueOut, uint amountOut);
 
+    /**
+     * @notice Emitted when locked state changes
+     */
+    event Locked(bool oldState, bool newState);
+
     // --------------- ADMIN ADJUSTABLE VARIABLES ----------- // 
 
     /**
@@ -105,7 +110,7 @@ contract TrendTokenStorage {
      * @notice Will redeem assets from Dual Pools if percentage of token equity in contract falls below this value
      * @dev This keeps a float of assets in the contract for low gas cost Trend Token deposits and redeems
      */
-    uint public contractFactor = 0.90e18;
+    uint public contractFactor = 1e18; // default none held as collateral
 
 
     /**
@@ -119,7 +124,7 @@ contract TrendTokenStorage {
      * @notice Prevents users from minting Trend Tokens beyond this limit
      * @dev Manager is able to adjust this value
      */
-    uint public maxSupply = 1000e18;
+    uint public maxSupply = 10000e18;
 
 
     /**
@@ -174,17 +179,18 @@ contract TrendTokenStorage {
 
 
     /**
-     * @notice Percentage of protocol earned XDP that goes to fee recipient
-     * @dev Does not increase the price of Trend Tokens
-     */
-    uint public accruedXDPtoFeeRecipient = 0.50e18;
-
-
-    /**
      * @notice Minimum position value allowed to disable token
      * @dev Disabling a token with a large balance would result in trend token price drop
      */
     uint public maxDisableTokenValue = 1e18;
+
+
+    /**
+     * @notice Allows trading bot to lock some actions from the Manager
+     * @dev An extra layer of security
+     */
+
+    bool locked = true;
     
 
     // --------------- TOKEN VARIABLES ----------- // 
