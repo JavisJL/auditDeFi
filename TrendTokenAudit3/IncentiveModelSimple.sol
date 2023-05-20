@@ -160,37 +160,6 @@ contract IncentiveModelSimple is IIncentiveModelSimple {
     }
 
 
-    /** CHANGE TO MAINNET ADDRESSES
-     * @notice Returns the base trading fee based on what token is deposited or redeemed
-     * @dev Higher base trading fee if token has lower liquidity to estimate higher slippage
-     
-    function feePerToken(IERC20 _bep20) public pure returns(uint) {
-        if (_bep20 == IERC20(0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd)) {
-            return 0.0020e18;
-        } else if (_bep20 == IERC20(0x8301F2213c0eeD49a7E28Ae4c3e91722919B8B47)) {
-            return 0.0025e18;
-        } else if (_bep20 == IERC20(0xA808e341e8e723DC6BA0Bb5204Bafc2330d7B8e4)) {
-            return 0.0035e18;
-        } else {
-            return 0.0050e18;
-        }
-    }
-    */
-
-
-    /**
-     * @notice Returns true if underlying is supported
-     */
-    function underlyingSupported(IERC20 underlying) internal view returns(bool) {
-        for (uint i = 0; i < allUnderlying.length; i ++) {
-            if (allUnderlying[i] == underlying) {
-                return true;
-            }
-        }
-        return false;
-    } 
-
-
     /**
      * @notice Allows admin to change the fee/reward for deposit, redeem, and trade for each token
      * @ testnet
@@ -201,7 +170,7 @@ contract IncentiveModelSimple is IIncentiveModelSimple {
     function _updateFeePerToken(IERC20 underlying, uint feeOrReward) external {
         require(msg.sender == admin,"!admin");
         require(feeOrReward > 0 && feeOrReward <= 0.05e18,"max 5%, min>0");
-        if (!underlyingSupported(underlying)) {
+        if (feePerToken[address(underlying)] == 0) {
             allUnderlying.push(underlying);
         }
         feePerToken[address(underlying)] = feeOrReward;
