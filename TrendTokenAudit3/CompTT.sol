@@ -249,11 +249,13 @@ contract CompTT is ComptrollerStorage {//}, ComptrollerErrorReporter, Exponentia
      */
     function _updateLockedWallet(address _newWallet) external {
         require(msg.sender == lockedWallet, "not lockedWallet");
+        require(_newWallet != address(0),"locked wallet cannot be zero address");
         address oldWallet = lockedWallet;
         lockedWallet = _newWallet;
         emit UpdateLockedWallet(oldWallet, lockedWallet);
 
     }
+
 
     /**
      * @notice Set depsoit, redeem, and trade to paused
@@ -296,6 +298,7 @@ contract CompTT is ComptrollerStorage {//}, ComptrollerErrorReporter, Exponentia
      */
     function _setPauseGuardian(address newPauseGuardian) external requireUnlocked returns (bool) {
         ensureAdmin();
+        require(newPauseGuardian != address(0),"newPauseGuardian cannot be zero address");
 
         ensureNonzeroAddress(newPauseGuardian);
 
@@ -450,4 +453,3 @@ contract CompTT is ComptrollerStorage {//}, ComptrollerErrorReporter, Exponentia
 
 
 }
-
