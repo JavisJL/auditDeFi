@@ -98,6 +98,11 @@ contract TrendTokenStorage {
      */
     event Locked(bool oldState, bool newState);
 
+    /**
+     * @notice Emited when setting new referral reward
+     */
+    event SetReferralReward(uint oldReward, uint newReward);
+
     // --------------- ADMIN ADJUSTABLE VARIABLES ----------- // 
 
     /**
