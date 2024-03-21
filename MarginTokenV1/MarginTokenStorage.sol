@@ -127,7 +127,7 @@ contract MarginTokenStorage {
      * @dev An extra layer of security
      */
 
-    bool public venusOpen = true;
+    bool public venusOpen = false;
     
 
     /**
