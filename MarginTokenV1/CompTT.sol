@@ -327,8 +327,8 @@ contract CompTT is ComptrollerStorage {
                                                         maxDisableValue: 100e18, // token may be removed from portfolio with balances max $100
                                                         maxTradeValue: 10000e18, // maximum amount a user can deposit, redeem, or swap
                                                         maxSupply: 1000000e18, // maximum Trend Token supply of Margin Token
-                                                        isSupplyVenus: true, // trend token cannot supply to venus
-                                                        isBorrowVenus: true, // trend token cannot borrow from venus
+                                                        isSupplyVenus: false, // trend token cannot supply to venus
+                                                        isBorrowVenus: false, // trend token cannot borrow from venus
                                                         maxBorrowFactor: 0.5e18, // trend token may borrow maximum 0% of borrowable   
                                                         maxMargin: 0.5e18}); // trend token cannot apply margin 'borrow/equity'
 
@@ -594,10 +594,9 @@ contract CompTT is ComptrollerStorage {
                                                     isRedeem: true, // users may redeem underlying from Trend Tokens
                                                     isTrade: true, // users may swap one underlying for another
                                                     vToken: address(0), // no vToken
-                                                    isVenusActive: true, // underlying cannot supply, redeem, borrow, or repay to Venus
-                                                    isSupplyVenus: true, // underlying cannot be supplied to Venus
-                                                    isBorrowVenus: true}); // underlying cannot be borrowed from Venus
-                                                    //maxPriceDifference: 0.0001e18}); // Oracle and Venus prices must 0.01% price difference
+                                                    isVenusActive: false, // underlying cannot supply, redeem, borrow, or repay to Venus
+                                                    isSupplyVenus: false, // underlying cannot be supplied to Venus
+                                                    isBorrowVenus: false}); // underlying cannot be borrowed from Venus
 
         // add to list of underlying
         supportedUnderlying.push(underlying);
