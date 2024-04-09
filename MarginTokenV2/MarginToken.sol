@@ -909,7 +909,7 @@ contract MarginToken is VenusIntegration, MarginTokenStorage {
 
 
     /**
-     * @notice Performs intermediary calculations for tradeInfo()
+     * @notice Performs intermediary calculations for swapInfo()
      * @return tokenEquityInOut The equity of tokenIn and tokenOut
      * @return desiredAllos The desired allocations of tokenIn and tokenOut
      * @return netEquity The net equity of the entire portfolio
