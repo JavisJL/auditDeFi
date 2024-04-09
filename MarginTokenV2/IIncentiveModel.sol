@@ -11,6 +11,9 @@ interface IIncentiveModel {
     /**
      * @notice For Lens
      */
+    function feeDiscount(uint balance) external view returns(uint);
+    function feePerToken(address underlying) external view returns(uint);
+
     function protocolFeeTrade() external view returns(uint);
 
     function protocolFeeDeposit() external view returns(uint);
