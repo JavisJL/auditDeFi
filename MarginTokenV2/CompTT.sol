@@ -43,6 +43,9 @@ contract CompTT is ComptrollerStorage {
     /// @notice Emitted when lockedWallet address is updated
     event UpdateLockedWallet(address oldWallet, address lockedWallet);
 
+    /// @notice Emitted when lockedWallet address is updated
+    event UpdateAdmin(address oldWallet, address lockedWallet);
+
     //// @notice Emitted when compVenus address is updated
     event NewCompVenus(address oldCompVenus, address compVenus);
 
@@ -53,7 +56,6 @@ contract CompTT is ComptrollerStorage {
 
     constructor() public {
         admin = msg.sender;
-        lockedWallet = msg.sender;
     }
 
 
@@ -68,6 +70,10 @@ contract CompTT is ComptrollerStorage {
 
     function ensureAdmin() private view {
         require(msg.sender == admin, "!admin");
+    }
+
+    function ensureLockedWallet() private view {
+        require(msg.sender == lockedWallet, "!lockedWallet");
     }
 
 
@@ -156,7 +162,7 @@ contract CompTT is ComptrollerStorage {
      * @dev Provides layer of security if CompTT keys comprimised
      */
     function _updateLockedState(bool _state) external {
-        require(msg.sender == lockedWallet,"not lockedWallet");
+        ensureLockedWallet();
         bool oldState = locked;
         locked = _state;
         emit Locked(oldState, locked);
@@ -168,14 +174,33 @@ contract CompTT is ComptrollerStorage {
      * @param _newWallet Address of new wallet, must be nonzero
      */
     function _updateLockedWallet(address _newWallet) external {
-        require(msg.sender == lockedWallet, "not lockedWallet");
+
+        // admin must set locked wallet initially
+        if (lockedWallet == address(0)) {
+            ensureAdmin();
+        } else {
+            ensureLockedWallet();
+        }
+
         ensureNonzeroAddress(_newWallet);
         address oldWallet = lockedWallet;
         lockedWallet = _newWallet;
         emit UpdateLockedWallet(oldWallet, lockedWallet);
-
     }
 
+
+    /**
+     * @notice Allows lockedWallet to change address
+     * @param _newWallet Address of new wallet, must be nonzero
+     */
+    function _updateAdmin(address _newWallet) external {
+        ensureAdmin();
+        ensureNonzeroAddress(_newWallet);
+        address oldWallet = lockedWallet;
+        admin = _newWallet;
+        emit UpdateAdmin(oldWallet, lockedWallet);
+
+    }
 
     /**
       * @notice Allows admin to set a new price oracle for the comptroller
