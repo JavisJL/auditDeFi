@@ -51,13 +51,13 @@ contract ComptrollerStorage is UnitrollerAdminStorage {
     /**
      * @notice Wallet that is able to change the state of locked
      */
-    address lockedWallet;
+    address public lockedWallet;
 
     /**
      * @notice Restrictions actions of admin if locked
      * @dev Adds an extra layer of security
      */
-    bool locked = true;
+    bool public locked = true;
 
 
     // --------------- PAUSE GUARDIAN -------------------- //
