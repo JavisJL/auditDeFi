@@ -68,8 +68,7 @@ interface ITrendTokenTkn {
      *
      * Emits a `Transfer` event.
      */
-    //function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
-    function transfersFrom(address sender, address recipient, uint256 amount) external returns(bool); // requires allowance (instead of subtraction overflow message)
+    function transferFrom(address sender, address recipient, uint256 amount) external returns(bool); // requires allowance (instead of subtraction overflow message)
 
     /**
      * @dev Emitted when `value` tokens are moved from one account (`from`) to
