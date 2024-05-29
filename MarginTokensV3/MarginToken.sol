@@ -882,7 +882,7 @@ contract MarginToken is VenusIntegration, MarginTokenStorage {
 
         // Receive Trend Tokens and send Performance Fee
         requireUnderAmount(trendTokenInAmt,_maxTrendTokenIn,"!maxIn");
-        trendToken.transfersFrom(msg.sender, address(this), trendTokenInAmt); 
+        trendToken.transferFrom(msg.sender, address(this), trendTokenInAmt); 
 
         // Burn deposited tokens but leave trendTokenFee in contract
         uint trendTokenFee = Lib.getValue(trendTokenInAmt,protocolFeePerc);
