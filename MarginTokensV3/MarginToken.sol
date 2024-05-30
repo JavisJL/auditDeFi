@@ -239,19 +239,6 @@ contract MarginToken is VenusIntegration, MarginTokenStorage {
 
     // ------- TRADING BOT: UPDATE PORTFOLIO --------- //)
 
-
-    /**
-     * @notice Allows tradingBot to change contract, collateral, and borrow values without changing portfolio
-     * @dev Most common function used by tradingBot (less frequently add or remove a token)
-     * @param _con The desired percent of equity in contract for existing portfolio
-     * @param _col The desired percent of equity in venus collateral for existing portfolio
-     * @param _bor The desired percent of equity in venus borrow for existing portfolio
-     
-    function _setDesiredAllocations(uint[] calldata _con, uint[] calldata _col, uint[] calldata _bor) onlyTradingBot external {
-        _setDesiredAllocationsFresh(_con, _col, _bor);
-    }*/
-
-
     /**
      * @notice Safely changes contract, collateral, and borrow allocations without changing portfolio
      * @dev Ensures the desired allocations are within margin limits and required permission from comptroller
