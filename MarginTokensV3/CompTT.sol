@@ -888,7 +888,7 @@ contract CompTT is ComptrollerStorage {
         checkTradeFee(trendToken,totalFeePerc);
 
         // checks if trendToken and underlying allows deposits
-        require(underlyingInfo[underlyingOut].isRedeem,"underlying redeems disabled.");
+        require(underlyingInfo[underlyingOut].isRedeem && trendTokens[trendToken].isRedeem,"!isRedeem.");
 
         return true;
         
