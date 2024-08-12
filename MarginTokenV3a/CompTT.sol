@@ -454,7 +454,7 @@ contract CompTT is ComptrollerStorage {
         // used when depositing, redeeming, or swapping
         if (_maxTradeValues>0) {
             // maximum trade that can possible be done is $100,000
-            require(_maxTradeValues <= 100000e18,"!maxTradeValue");
+            require(_maxTradeValues <= 10000000e18,"!maxTradeValue");
             trendTokens[trendToken].maxTradeValue = _maxTradeValues;
         }
 
